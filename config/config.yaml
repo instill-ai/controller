@@ -1,0 +1,63 @@
+server:
+  port: 8085
+  https:
+    cert:
+    key:
+  corsorigins:
+  edition: local-ce:dev
+  disableusage: false
+  debug: true
+etcd:
+  host: etcd
+  port: 2379
+  timeout: 30
+database:
+  username: postgres
+  password: password
+  host: pg-sql
+  port: 5432
+  name: pipeline
+  version: 1
+  timezone: Etc/UTC
+  pool:
+    idleconnections: 5
+    maxconnections: 10
+    connlifetime: 30m # In minutes, e.g., '60m'
+cache:
+  redis:
+    redisoptions:
+      addr: redis:6379
+temporal:
+  clientoptions:
+    hostport: temporal:7233
+tritonserver:
+  grpcuri: triton-server:8001
+  modelstore: /model-repository
+connectorbackend:
+  host: connector-backend
+  port: 8082
+  https:
+    cert:
+    key:
+modelbackend:
+  host: model-backend
+  port: 8083
+  https:
+    cert:
+    key:
+pipelinebackend:
+  host: pipeline-backend
+  port: 8081
+  https:
+    cert:
+    key:
+mgmtbackend:
+  host: mgmt-backend
+  publicport: 8084
+  https:
+    cert:
+    key:
+usageserver:
+  tlsenabled: true
+  host: usage.instill.tech
+  port: 443
