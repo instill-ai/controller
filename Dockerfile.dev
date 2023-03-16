@@ -24,6 +24,7 @@ RUN tar -xf k6-v${K6_VERSION}-linux-$TARGETARCH.tar.gz --strip-components 1 -C /
 
 COPY . .
 RUN go mod download
+RUN chown -R nobody:nogroup /${SERVICE_NAME}
 
 RUN chown -R nobody:nogroup /go
 ENV GOCACHE /go/.cache/go-build

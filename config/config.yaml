@@ -6,11 +6,13 @@ server:
   corsorigins:
   edition: local-ce:dev
   disableusage: false
+  loopinterval: 5
+  timeout: 120
   debug: true
 etcd:
   host: etcd
   port: 2379
-  timeout: 30
+  timeout: 10
 database:
   username: postgres
   password: password
@@ -41,7 +43,8 @@ connectorbackend:
     key:
 modelbackend:
   host: model-backend
-  port: 8083
+  publicport: 8083
+  privateport: 3083
   https:
     cert:
     key:

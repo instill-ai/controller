@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/rs/cors"
@@ -117,6 +118,9 @@ func main() {
 	pipelinePublicServiceClient, pipelinePublicServiceClientConn := external.InitPipelinePublicServiceClient()
 	defer pipelinePublicServiceClientConn.Close()
 
+	modelPublicServiceClient, modelPublicServiceClientConn := external.InitModelPublicServiceClient()
+	defer modelPublicServiceClientConn.Close()
+
 	modelPrivateServiceClient, modelPrivateServiceClientConn := external.InitModelPrivateServiceClient()
 	defer modelPrivateServiceClientConn.Close()
 
@@ -131,6 +135,7 @@ func main() {
 			service.NewService(
 				*etcdClient,
 				modelPrivateServiceClient,
+				modelPublicServiceClient,
 				mgmtPublicServiceClient,
 				pipelinePublicServiceClient,
 				connectorPublicServiceClient,
@@ -184,6 +189,44 @@ func main() {
 		}()
 	}
 	logger.Info("gRPC server is running.")
+
+	go func() {
+		service := service.NewService(
+			*etcdClient,
+			modelPrivateServiceClient,
+			modelPublicServiceClient,
+			mgmtPublicServiceClient,
+			pipelinePublicServiceClient,
+			connectorPublicServiceClient,
+		)
+		logger.Info("[controller] control loop started")
+		for {
+			// Backend services
+			err := service.ProbeBackend(config.Config.ModelBackend.Host)
+			if err != nil {
+				logger.Error(err.Error())
+			}
+
+			// err = service.ProbeBackend(config.Config.PipelineBackend.Host)
+			// if err != nil {
+			// 	errSig <- err
+			// }
+
+			// err = service.ProbeBackend(config.Config.MgmtBackend.Host)
+			// if err != nil {
+			// 	errSig <- err
+			// }
+
+			// Models
+			err = service.ProbeModels()
+
+			if err != nil {
+				logger.Error(err.Error())
+			}
+
+			time.Sleep(config.Config.Server.LoopInterval * time.Second)
+		}
+	}()
 
 	// kill (no param) default send syscall.SIGTERM
 	// kill -2 is syscall.SIGINT
