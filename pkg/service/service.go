@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/config"
+	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/pkg/datamodel"
+	"github.com/instill-ai/model-backend/pkg/repository"
 
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
@@ -21,6 +24,10 @@ type Service interface {
 	GetResourceState(resourceName string) (*datamodel.Resource, error)
 	UpdateResourceState(resourceName string, state controllerPB.Resource_State) error
 	DeleteResourceState(resourceName string) error
+	GetResourceWorkflowID(resourceName string) (*string, error)
+	UpdateResourceWorkflowID(resourceName string, workflowID string) error
+	DeleteResourceWorkflowID(resourceName string) error
+	GetOperationInfo(workflowID string) (*longrunningpb.Operation, error)
 	ProbeBackend(serviceName string) error
 	ProbeModels() error
 }
@@ -55,6 +62,8 @@ func (s *service) GetResourceState(resourceName string) (*datamodel.Resource, er
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
+	// logger, _ := logger.GetZapLogger()
+
 	resp, err := s.etcdClient.Get(ctx, resourceName)
 
 	if err != nil {
@@ -72,6 +81,8 @@ func (s *service) GetResourceState(resourceName string) (*datamodel.Resource, er
 		State: controllerPB.Resource_State(kvs[0].Value[0]),
 	}
 
+	// logger.Info(fmt.Sprintf("[Etcd Client] Get %v", resource))
+
 	return &resource, nil
 }
 
@@ -79,11 +90,29 @@ func (s *service) UpdateResourceState(resourceName string, state controllerPB.Re
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
+	logger, _ := logger.GetZapLogger()
+
+	workflowID, _ := s.GetResourceWorkflowID(resourceName)
+
+	if workflowID != nil {
+		opInfo, err := s.GetOperationInfo(*workflowID)
+
+		if err != nil {
+			return err
+		}
+
+		if !opInfo.Done {
+			state = controllerPB.Resource_STATE_UNSPECIFIED
+		}
+	}
+
 	_, err := s.etcdClient.Put(ctx, resourceName, string(state))
 
 	if err != nil {
 		return err
 	}
+
+	logger.Info(fmt.Sprintf("[Etcd Client] Got %v with %v", resourceName, state))
 
 	return nil
 }
@@ -92,11 +121,80 @@ func (s *service) DeleteResourceState(resourceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
+	logger, _ := logger.GetZapLogger()
+
 	_, err := s.etcdClient.Delete(ctx, resourceName)
 
 	if err != nil {
 		return err
 	}
+
+	logger.Info(fmt.Sprintf("[Etcd Client] Delete %v", resourceName))
+
+	return nil
+}
+
+func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
+	defer cancel()
+
+	// logger, _ := logger.GetZapLogger()
+
+	resourceName = "workflow/" + resourceName
+
+	resp, err := s.etcdClient.Get(ctx, resourceName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	kvs := resp.Kvs
+
+	if len(kvs) == 0 {
+		return nil, fmt.Errorf("workflowID not found in etcd storage")
+	}
+
+	workflowId := string(kvs[0].Value[:])
+
+	// logger.Info(fmt.Sprintf("[Etcd Client] Get %v, id: %v", resourceName, workflowId))
+
+	return &workflowId, nil
+}
+
+func (s *service) UpdateResourceWorkflowID(resourceName string, workflowID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
+	defer cancel()
+
+	// logger, _ := logger.GetZapLogger()
+
+	resourceName = "workflow/" + resourceName
+
+	_, err := s.etcdClient.Put(ctx, resourceName, workflowID)
+
+	if err != nil {
+		return err
+	}
+
+	// logger.Info(fmt.Sprintf("[Etcd Client] Update %v with %v", resourceName, workflowID))
+
+	return nil
+}
+
+func (s *service) DeleteResourceWorkflowID(resourceName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
+	defer cancel()
+
+	// logger, _ := logger.GetZapLogger()
+
+	resourceName = "workflow/" + resourceName
+
+	_, err := s.etcdClient.Delete(ctx, resourceName)
+
+	if err != nil {
+		return err
+	}
+
+	// logger.Info(fmt.Sprintf("[Etcd Client] Delete %v", resourceName))
 
 	return nil
 }
@@ -138,7 +236,7 @@ func (s *service) ProbeBackend(serviceName string) error {
 	}
 
 	state := controllerPB.Resource_STATE_ERROR
-	switch healthcheck.Status{
+	switch healthcheck.Status {
 	case 0:
 		state = controllerPB.Resource_STATE_UNSPECIFIED
 	case 1:
@@ -158,7 +256,7 @@ func (s *service) ProbeModels() error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
 	defer cancel()
 
-	resp, err := s.modelPublicClient.ListModel(ctx, &modelPB.ListModelRequest{})
+	resp, err := s.modelPublicClient.ListModels(ctx, &modelPB.ListModelsRequest{})
 
 	if err != nil {
 		return err
@@ -168,8 +266,8 @@ func (s *service) ProbeModels() error {
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize == 10 {
-		resp, err := s.modelPublicClient.ListModel(ctx, &modelPB.ListModelRequest{
+	for totalSize > repository.DefaultPageSize {
+		resp, err := s.modelPublicClient.ListModels(ctx, &modelPB.ListModelsRequest{
 			PageToken: nextPageToken,
 		})
 
@@ -178,14 +276,14 @@ func (s *service) ProbeModels() error {
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize = resp.TotalSize
+		totalSize -= repository.DefaultPageSize
 		models = append(models, resp.Models...)
 	}
 
 	modelInstances := []*modelPB.ModelInstance{}
 	for _, model := range models {
 		view := modelPB.View_VIEW_FULL
-		resp, err := s.modelPublicClient.ListModelInstance(ctx, &modelPB.ListModelInstanceRequest{
+		resp, err := s.modelPublicClient.ListModelInstances(ctx, &modelPB.ListModelInstancesRequest{
 			Parent: model.Name,
 			View:   &view,
 		})
@@ -197,8 +295,8 @@ func (s *service) ProbeModels() error {
 		totalSize := resp.TotalSize
 		modelInstances = append(modelInstances, resp.Instances...)
 
-		for totalSize == 10 {
-			resp, err := s.modelPublicClient.ListModelInstance(ctx, &modelPB.ListModelInstanceRequest{
+		for totalSize > repository.DefaultPageSize {
+			resp, err := s.modelPublicClient.ListModelInstances(ctx, &modelPB.ListModelInstancesRequest{
 				Parent:    model.Name,
 				PageToken: nextPageToken,
 				View:      &view,
@@ -209,6 +307,7 @@ func (s *service) ProbeModels() error {
 			}
 
 			nextPageToken = &resp.NextPageToken
+			totalSize -= repository.DefaultPageSize
 			modelInstances = append(modelInstances, resp.Instances...)
 		}
 	}
@@ -230,4 +329,19 @@ func (s *service) ProbeModels() error {
 	}
 
 	return nil
+}
+
+func (s *service) GetOperationInfo(workflowID string) (*longrunningpb.Operation, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
+	defer cancel()
+
+	operation, err := s.modelPublicClient.GetModelOperation(ctx, &modelPB.GetModelOperationRequest{
+		Name: fmt.Sprintf("operations/%s", workflowID),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return operation.Operation, nil
 }
