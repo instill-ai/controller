@@ -67,6 +67,7 @@ func main() {
 	}()
 	grpc_zap.ReplaceGrpcLoggerV2(logger)
 
+	// TODO: remove if unnecessary
 	db := database.GetConnection()
 	defer database.Close(db)
 
@@ -207,16 +208,6 @@ func main() {
 			if err != nil {
 				logger.Error(err.Error())
 			}
-
-			// err = service.ProbeBackend(config.Config.PipelineBackend.Host)
-			// if err != nil {
-			// 	errSig <- err
-			// }
-
-			// err = service.ProbeBackend(config.Config.MgmtBackend.Host)
-			// if err != nil {
-			// 	errSig <- err
-			// }
 
 			// Models
 			err = service.ProbeModels()

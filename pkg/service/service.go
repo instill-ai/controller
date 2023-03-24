@@ -64,8 +64,6 @@ func (s *service) GetResourceState(resourceName string) (*controllerPB.Resource,
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	// logger, _ := logger.GetZapLogger()
-
 	resp, err := s.etcdClient.Get(ctx, resourceName)
 
 	if err != nil {
@@ -123,11 +121,7 @@ func (s *service) UpdateResourceState(resource *controllerPB.Resource) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	// logger, _ := logger.GetZapLogger()
-
 	workflowID, _ := s.GetResourceWorkflowID(resource.Name)
-
-	// logger.Info(fmt.Sprintf("[Etcd Client] Got %v's workflowID %v", resourceName, workflowID))
 
 	resourceType := strings.SplitN(resource.Name, "/", 4)[3]
 
@@ -148,8 +142,6 @@ func (s *service) UpdateResourceState(resource *controllerPB.Resource) error {
 
 	if workflowID != nil {
 		opInfo, err := s.GetOperationInfo(*workflowID)
-
-		// logger.Info(fmt.Sprintf("[Etcd Client] Got %v's opInfo %v", workflowID, opInfo))
 
 		if err != nil {
 			return err
@@ -184,15 +176,11 @@ func (s *service) DeleteResourceState(resourceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	// logger, _ := logger.GetZapLogger()
-
 	_, err := s.etcdClient.Delete(ctx, resourceName)
 
 	if err != nil {
 		return err
 	}
-
-	// logger.Info(fmt.Sprintf("[Etcd Client] Delete %v", resourceName))
 
 	return nil
 }
@@ -200,8 +188,6 @@ func (s *service) DeleteResourceState(resourceName string) error {
 func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
-
-	// logger, _ := logger.GetZapLogger()
 
 	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
 
@@ -219,16 +205,12 @@ func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
 
 	workflowId := string(kvs[0].Value[:])
 
-	// logger.Info(fmt.Sprintf("[Etcd Client] Get %v, id: %v", resourceName, workflowId))
-
 	return &workflowId, nil
 }
 
 func (s *service) UpdateResourceWorkflowID(resourceName string, workflowID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
-
-	// logger, _ := logger.GetZapLogger()
 
 	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
 
@@ -238,16 +220,12 @@ func (s *service) UpdateResourceWorkflowID(resourceName string, workflowID strin
 		return err
 	}
 
-	// logger.Info(fmt.Sprintf("[Etcd Client] Update %v with %v", resourceName, workflowID))
-
 	return nil
 }
 
 func (s *service) DeleteResourceWorkflowID(resourceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
-
-	// logger, _ := logger.GetZapLogger()
 
 	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
 
@@ -256,8 +234,6 @@ func (s *service) DeleteResourceWorkflowID(resourceName string) error {
 	if err != nil {
 		return err
 	}
-
-	// logger.Info(fmt.Sprintf("[Etcd Client] Delete %v", resourceName))
 
 	return nil
 }
