@@ -47,11 +47,7 @@ func (h *PrivateHandler) GetResource(ctx context.Context, req *controllerPB.GetR
 	}
 
 	return &controllerPB.GetResourceResponse{
-		Resource: &controllerPB.Resource{
-			Name:     resource.Name,
-			State:    resource.State,
-			Progress: resource.Progress,
-		},
+		Resource: resource,
 	}, nil
 }
 
@@ -63,7 +59,7 @@ func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.U
 			return nil, err
 		}
 	}
-	err := h.service.UpdateResourceState(req.Resource.Name, req.Resource.State)
+	err := h.service.UpdateResourceState(req.Resource)
 
 	if err != nil {
 		return nil, err

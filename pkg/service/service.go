@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/config"
 	"github.com/instill-ai/controller/internal/logger"
-	"github.com/instill-ai/controller/pkg/datamodel"
+	"github.com/instill-ai/controller/internal/util"
 	"github.com/instill-ai/model-backend/pkg/repository"
 
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
@@ -21,8 +23,8 @@ import (
 )
 
 type Service interface {
-	GetResourceState(resourceName string) (*datamodel.Resource, error)
-	UpdateResourceState(resourceName string, state controllerPB.Resource_State) error
+	GetResourceState(resourceName string) (*controllerPB.Resource, error)
+	UpdateResourceState(resource *controllerPB.Resource) error
 	DeleteResourceState(resourceName string) error
 	GetResourceWorkflowID(resourceName string) (*string, error)
 	UpdateResourceWorkflowID(resourceName string, workflowID string) error
@@ -58,7 +60,7 @@ func NewService(
 	}
 }
 
-func (s *service) GetResourceState(resourceName string) (*datamodel.Resource, error) {
+func (s *service) GetResourceState(resourceName string) (*controllerPB.Resource, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
@@ -73,46 +75,107 @@ func (s *service) GetResourceState(resourceName string) (*datamodel.Resource, er
 	kvs := resp.Kvs
 
 	if len(kvs) == 0 {
-		return nil, fmt.Errorf("resource not found in etcd storage")
+		return nil, fmt.Errorf(fmt.Sprintf("resource %v not found in etcd storage ", resourceName))
 	}
 
-	resource := datamodel.Resource{
-		Name:  resourceName,
-		State: controllerPB.Resource_State(kvs[0].Value[0]),
+	resourceType := strings.SplitN(resourceName, "/", 4)[3]
+
+	stateEnumValue, _ := strconv.Atoi(string(kvs[0].Value[:]))
+
+	switch resourceType {
+	case util.RESOURCE_TYPE_MODEL:
+		return &controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_ModelInstanceState{
+				ModelInstanceState: modelPB.ModelInstance_State(stateEnumValue),
+			},
+			Progress: nil,
+		}, nil
+	case util.RESOURCE_TYPE_PIPELINE:
+		return &controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_PipelineState{
+				PipelineState: pipelinePB.Pipeline_State(stateEnumValue),
+			},
+			Progress: nil,
+		}, nil
+	case util.RESOURCE_TYPE_CONNECTOR:
+		return &controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_ConnectorState{
+				ConnectorState: connectorPB.Connector_State(stateEnumValue),
+			},
+			Progress: nil,
+		}, nil
+	case util.RESOURCE_TYPE_SERVICE:
+		return &controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_BackendState{
+				BackendState: healthcheckv1alpha.HealthCheckResponse_ServingStatus(stateEnumValue),
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("resource type not implemented")
 	}
-
-	// logger.Info(fmt.Sprintf("[Etcd Client] Get %v", resource))
-
-	return &resource, nil
 }
 
-func (s *service) UpdateResourceState(resourceName string, state controllerPB.Resource_State) error {
+func (s *service) UpdateResourceState(resource *controllerPB.Resource) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	logger, _ := logger.GetZapLogger()
+	// logger, _ := logger.GetZapLogger()
 
-	workflowID, _ := s.GetResourceWorkflowID(resourceName)
+	workflowID, _ := s.GetResourceWorkflowID(resource.Name)
+
+	// logger.Info(fmt.Sprintf("[Etcd Client] Got %v's workflowID %v", resourceName, workflowID))
+
+	resourceType := strings.SplitN(resource.Name, "/", 4)[3]
+
+	state := 0
+
+	switch resourceType {
+	case util.RESOURCE_TYPE_MODEL:
+		state = int(resource.GetModelInstanceState())
+	case util.RESOURCE_TYPE_PIPELINE:
+		state = int(resource.GetPipelineState())
+	case util.RESOURCE_TYPE_CONNECTOR:
+		state = int(resource.GetConnectorState())
+	case util.RESOURCE_TYPE_SERVICE:
+		state = int(resource.GetBackendState())
+	default:
+		return fmt.Errorf("resource type not implemented")
+	}
 
 	if workflowID != nil {
 		opInfo, err := s.GetOperationInfo(*workflowID)
+
+		// logger.Info(fmt.Sprintf("[Etcd Client] Got %v's opInfo %v", workflowID, opInfo))
 
 		if err != nil {
 			return err
 		}
 
 		if !opInfo.Done {
-			state = controllerPB.Resource_STATE_UNSPECIFIED
+			switch resourceType {
+			case util.RESOURCE_TYPE_MODEL:
+				state = int(modelPB.ModelInstance_STATE_UNSPECIFIED)
+			case util.RESOURCE_TYPE_PIPELINE:
+				state = int(pipelinePB.Pipeline_STATE_UNSPECIFIED)
+			case util.RESOURCE_TYPE_CONNECTOR:
+				state = int(connectorPB.Connector_STATE_UNSPECIFIED)
+			case util.RESOURCE_TYPE_SERVICE:
+				state = int(healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED)
+			default:
+				return fmt.Errorf("resource type not implemented")
+			}
 		}
 	}
 
-	_, err := s.etcdClient.Put(ctx, resourceName, string(state))
+	_, err := s.etcdClient.Put(ctx, resource.Name, fmt.Sprint(state))
 
 	if err != nil {
 		return err
 	}
-
-	logger.Info(fmt.Sprintf("[Etcd Client] Got %v with %v", resourceName, state))
 
 	return nil
 }
@@ -121,7 +184,7 @@ func (s *service) DeleteResourceState(resourceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	logger, _ := logger.GetZapLogger()
+	// logger, _ := logger.GetZapLogger()
 
 	_, err := s.etcdClient.Delete(ctx, resourceName)
 
@@ -129,7 +192,7 @@ func (s *service) DeleteResourceState(resourceName string) error {
 		return err
 	}
 
-	logger.Info(fmt.Sprintf("[Etcd Client] Delete %v", resourceName))
+	// logger.Info(fmt.Sprintf("[Etcd Client] Delete %v", resourceName))
 
 	return nil
 }
@@ -140,9 +203,9 @@ func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
 
 	// logger, _ := logger.GetZapLogger()
 
-	resourceName = "workflow/" + resourceName
+	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
 
-	resp, err := s.etcdClient.Get(ctx, resourceName)
+	resp, err := s.etcdClient.Get(ctx, resourceWorkflowId)
 
 	if err != nil {
 		return nil, err
@@ -167,9 +230,9 @@ func (s *service) UpdateResourceWorkflowID(resourceName string, workflowID strin
 
 	// logger, _ := logger.GetZapLogger()
 
-	resourceName = "workflow/" + resourceName
+	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
 
-	_, err := s.etcdClient.Put(ctx, resourceName, workflowID)
+	_, err := s.etcdClient.Put(ctx, resourceWorkflowId, workflowID)
 
 	if err != nil {
 		return err
@@ -186,9 +249,9 @@ func (s *service) DeleteResourceWorkflowID(resourceName string) error {
 
 	// logger, _ := logger.GetZapLogger()
 
-	resourceName = "workflow/" + resourceName
+	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
 
-	_, err := s.etcdClient.Delete(ctx, resourceName)
+	_, err := s.etcdClient.Delete(ctx, resourceWorkflowId)
 
 	if err != nil {
 		return err
@@ -202,6 +265,8 @@ func (s *service) DeleteResourceWorkflowID(resourceName string) error {
 func (s *service) ProbeBackend(serviceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
 	defer cancel()
+
+	logger, _ := logger.GetZapLogger()
 
 	healthcheck := healthcheckv1alpha.HealthCheckResponse{}
 	switch serviceName {
@@ -235,26 +300,39 @@ func (s *service) ProbeBackend(serviceName string) error {
 		healthcheck = *resp.GetHealthCheckResponse()
 	}
 
-	state := controllerPB.Resource_STATE_ERROR
+	state := healthcheck.Status
 	switch healthcheck.Status {
 	case 0:
-		state = controllerPB.Resource_STATE_UNSPECIFIED
+		state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED
 	case 1:
-		state = controllerPB.Resource_STATE_ONLINE
+		state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_SERVING
 	case 2:
-		state = controllerPB.Resource_STATE_OFFLINE
+		state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_NOT_SERVING
 	}
-	err := s.UpdateResourceState(serviceName, state)
+
+	err := s.UpdateResourceState(&controllerPB.Resource{
+		Name: util.ConvertServiceToResourceName(serviceName),
+		State: &controllerPB.Resource_BackendState{
+			BackendState: state,
+		},
+	})
 
 	if err != nil {
 		return err
 	}
+
+	resp, _ := s.GetResourceState(util.ConvertServiceToResourceName(serviceName))
+
+	logger.Info(fmt.Sprintf("[Controller] Got %v", resp))
+
 	return nil
 }
 
 func (s *service) ProbeModels() error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
 	defer cancel()
+
+	logger, _ := logger.GetZapLogger()
 
 	resp, err := s.modelPublicClient.ListModels(ctx, &modelPB.ListModelsRequest{})
 
@@ -321,11 +399,19 @@ func (s *service) ProbeModels() error {
 			return err
 		}
 
-		err = s.UpdateResourceState(resp.Resource.Name, resp.Resource.State)
+		err = s.UpdateResourceState(&controllerPB.Resource{
+			Name: util.ConvertModelToResourceName(modelInstance.Name),
+			State: &controllerPB.Resource_ModelInstanceState{
+				ModelInstanceState: resp.State,
+			},
+		})
 
 		if err != nil {
 			return err
 		}
+
+		logResp, _ := s.GetResourceState(util.ConvertModelToResourceName(modelInstance.Name))
+		logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 	}
 
 	return nil

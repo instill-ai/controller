@@ -201,6 +201,7 @@ func main() {
 		)
 		logger.Info("[controller] control loop started")
 		for {
+			logger.Info("[Controller] --------------Start probing------------")
 			// Backend services
 			err := service.ProbeBackend(config.Config.ModelBackend.Host)
 			if err != nil {
