@@ -78,7 +78,7 @@ func (s *service) GetResourceState(resourceName string) (*controllerPB.Resource,
 
 	resourceType := strings.SplitN(resourceName, "/", 4)[3]
 
-	stateEnumValue, _ := strconv.Atoi(string(kvs[0].Value[:]))
+	stateEnumValue, _ := strconv.ParseInt(string(kvs[0].Value[:]), 10, 32)
 
 	switch resourceType {
 	case util.RESOURCE_TYPE_MODEL:
