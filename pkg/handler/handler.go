@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"strings"
 
 	"github.com/instill-ai/controller/pkg/service"
 
@@ -41,24 +40,26 @@ func (h *PrivateHandler) Readiness(ctx context.Context, in *controllerPB.Readine
 }
 
 func (h *PrivateHandler) GetResource(ctx context.Context, req *controllerPB.GetResourceRequest) (*controllerPB.GetResourceResponse, error) {
-	resourceName, _, _ := strings.Cut(req.Name, "/watch")
-	resource, err := h.service.GetResourceState(resourceName)
+	resource, err := h.service.GetResourceState(req.Name)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return &controllerPB.GetResourceResponse{
-		Resource: &controllerPB.Resource{
-			Name:     resource.Name,
-			State:    resource.State,
-			Progress: resource.Progress,
-		},
+		Resource: resource,
 	}, nil
 }
 
 func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.UpdateResourceRequest) (*controllerPB.UpdateResourceResponse, error) {
-	err := h.service.UpdateResourceState(req.Resource.Name, req.Resource.State)
+	if req.WorkflowId != nil {
+		err := h.service.UpdateResourceWorkflowID(req.Resource.Name, *req.WorkflowId)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+	err := h.service.UpdateResourceState(req.Resource)
 
 	if err != nil {
 		return nil, err
@@ -71,6 +72,12 @@ func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.U
 
 func (h *PrivateHandler) DeleteResource(ctx context.Context, req *controllerPB.DeleteResourceRequest) (*controllerPB.DeleteResourceResponse, error) {
 	err := h.service.DeleteResourceState(req.Name)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = h.service.DeleteResourceWorkflowID(req.Name)
 
 	if err != nil {
 		return nil, err
