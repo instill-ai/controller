@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/config"
 	"github.com/instill-ai/controller/internal/logger"
+	"github.com/instill-ai/controller/internal/triton"
 	"github.com/instill-ai/controller/internal/util"
 	"github.com/instill-ai/model-backend/pkg/repository"
 
@@ -30,33 +31,44 @@ type Service interface {
 	UpdateResourceWorkflowID(resourceName string, workflowID string) error
 	DeleteResourceWorkflowID(resourceName string) error
 	GetOperationInfo(workflowID string) (*longrunningpb.Operation, error)
-	ProbeBackend(serviceName string) error
+	ProbeBackend() error
 	ProbeModels() error
+	ProbeSourceConnectors() error
+	ProbeDestinationConnectors() error
 }
 
 type service struct {
-	etcdClient         etcdv3.Client
-	modelPublicClient  modelPB.ModelPublicServiceClient
-	modelPrivateClient modelPB.ModelPrivateServiceClient
-	mgmtClient         mgmtPB.MgmtPublicServiceClient
-	pipelineClient     pipelinePB.PipelinePublicServiceClient
-	connectorClient    connectorPB.ConnectorPublicServiceClient
+	etcdClient             etcdv3.Client
+	tritonClient           inferenceserver.GRPCInferenceServiceClient
+	mgmtPublicClient       mgmtPB.MgmtPublicServiceClient
+	modelPublicClient      modelPB.ModelPublicServiceClient
+	modelPrivateClient     modelPB.ModelPrivateServiceClient
+	pipelinePublicClient   pipelinePB.PipelinePublicServiceClient
+	pipelinePrivateClient  pipelinePB.PipelinePrivateServiceClient
+	connectorPublicClient  connectorPB.ConnectorPublicServiceClient
+	connectorPrivateClient connectorPB.ConnectorPrivateServiceClient
 }
 
 func NewService(
 	e etcdv3.Client,
-	m modelPB.ModelPrivateServiceClient,
-	mp modelPB.ModelPublicServiceClient,
+	t inferenceserver.GRPCInferenceServiceClient,
 	mg mgmtPB.MgmtPublicServiceClient,
+	mp modelPB.ModelPublicServiceClient,
+	m modelPB.ModelPrivateServiceClient,
 	p pipelinePB.PipelinePublicServiceClient,
-	c connectorPB.ConnectorPublicServiceClient) Service {
+	pp pipelinePB.PipelinePrivateServiceClient,
+	c connectorPB.ConnectorPublicServiceClient,
+	cp connectorPB.ConnectorPrivateServiceClient) Service {
 	return &service{
-		etcdClient:         e,
-		modelPublicClient:  mp,
-		modelPrivateClient: m,
-		mgmtClient:         mg,
-		pipelineClient:     p,
-		connectorClient:    c,
+		etcdClient:             e,
+		tritonClient:           t,
+		mgmtPublicClient:       mg,
+		modelPublicClient:      mp,
+		modelPrivateClient:     m,
+		pipelinePublicClient:   p,
+		pipelinePrivateClient:  pp,
+		connectorPublicClient:  c,
+		connectorPrivateClient: cp,
 	}
 }
 
@@ -97,7 +109,7 @@ func (s *service) GetResourceState(resourceName string) (*controllerPB.Resource,
 			},
 			Progress: nil,
 		}, nil
-	case util.RESOURCE_TYPE_CONNECTOR:
+	case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
 		return &controllerPB.Resource{
 			Name: resourceName,
 			State: &controllerPB.Resource_ConnectorState{
@@ -132,7 +144,7 @@ func (s *service) UpdateResourceState(resource *controllerPB.Resource) error {
 		state = int(resource.GetModelInstanceState())
 	case util.RESOURCE_TYPE_PIPELINE:
 		state = int(resource.GetPipelineState())
-	case util.RESOURCE_TYPE_CONNECTOR:
+	case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
 		state = int(resource.GetConnectorState())
 	case util.RESOURCE_TYPE_SERVICE:
 		state = int(resource.GetBackendState())
@@ -153,7 +165,7 @@ func (s *service) UpdateResourceState(resource *controllerPB.Resource) error {
 				state = int(modelPB.ModelInstance_STATE_UNSPECIFIED)
 			case util.RESOURCE_TYPE_PIPELINE:
 				state = int(pipelinePB.Pipeline_STATE_UNSPECIFIED)
-			case util.RESOURCE_TYPE_CONNECTOR:
+			case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
 				state = int(connectorPB.Connector_STATE_UNSPECIFIED)
 			case util.RESOURCE_TYPE_SERVICE:
 				state = int(healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED)
@@ -189,7 +201,7 @@ func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
+	resourceWorkflowId := util.ConvertWorkflfowToWorkflowResourceName(resourceName)
 
 	resp, err := s.etcdClient.Get(ctx, resourceWorkflowId)
 
@@ -212,7 +224,7 @@ func (s *service) UpdateResourceWorkflowID(resourceName string, workflowID strin
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
+	resourceWorkflowId := util.ConvertWorkflfowToWorkflowResourceName(resourceName)
 
 	_, err := s.etcdClient.Put(ctx, resourceWorkflowId, workflowID)
 
@@ -227,7 +239,7 @@ func (s *service) DeleteResourceWorkflowID(resourceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	resourceWorkflowId := util.ConvertWorkflfowToResourceWorkflow(resourceName)
+	resourceWorkflowId := util.ConvertWorkflfowToWorkflowResourceName(resourceName)
 
 	_, err := s.etcdClient.Delete(ctx, resourceWorkflowId)
 
@@ -238,68 +250,96 @@ func (s *service) DeleteResourceWorkflowID(resourceName string) error {
 	return nil
 }
 
-func (s *service) ProbeBackend(serviceName string) error {
+func (s *service) ProbeBackend() error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
 	defer cancel()
 
 	logger, _ := logger.GetZapLogger()
 
-	healthcheck := healthcheckv1alpha.HealthCheckResponse{}
-	switch serviceName {
-	case config.Config.ModelBackend.Host:
-		resp, err := s.modelPublicClient.Liveness(ctx, &modelPB.LivenessRequest{})
-
-		if err != nil {
-			return err
-		}
-		healthcheck = *resp.GetHealthCheckResponse()
-	case config.Config.PipelineBackend.Host:
-		resp, err := s.pipelineClient.Liveness(ctx, &pipelinePB.LivenessRequest{})
-
-		if err != nil {
-			return err
-		}
-		healthcheck = *resp.GetHealthCheckResponse()
-	case config.Config.MgmtBackend.Host:
-		resp, err := s.mgmtClient.Liveness(ctx, &mgmtPB.LivenessRequest{})
-
-		if err != nil {
-			return err
-		}
-		healthcheck = *resp.GetHealthCheckResponse()
-	case config.Config.ConnectorBackend.Host:
-		resp, err := s.connectorClient.Liveness(ctx, &connectorPB.LivenessRequest{})
-
-		if err != nil {
-			return err
-		}
-		healthcheck = *resp.GetHealthCheckResponse()
+	healthcheck := healthcheckv1alpha.HealthCheckResponse{
+		Status: healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED,
 	}
 
-	state := healthcheck.Status
-	switch healthcheck.Status {
-	case 0:
-		state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED
-	case 1:
-		state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_SERVING
-	case 2:
-		state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_NOT_SERVING
+	var backenServices = [...]string{
+		config.Config.TritonServer.Host,
+		config.Config.ConnectorBackend.Host,
+		config.Config.ModelBackend.Host,
+		config.Config.PipelineBackend.Host,
+		config.Config.MgmtBackend.Host,
 	}
 
-	err := s.UpdateResourceState(&controllerPB.Resource{
-		Name: util.ConvertServiceToResourceName(serviceName),
-		State: &controllerPB.Resource_BackendState{
-			BackendState: state,
-		},
-	})
+	for _, hostname := range backenServices {
+		switch hostname {
+		case config.Config.TritonServer.Host:
+			resp, err := s.tritonClient.ServerLive(ctx, &inferenceserver.ServerLiveRequest{})
 
-	if err != nil {
-		return err
+			if err != nil {
+				return err
+			}
+			if resp.GetLive() {
+				healthcheck = healthcheckv1alpha.HealthCheckResponse{
+					Status: healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_SERVING,
+				}
+			} else {
+				healthcheck = healthcheckv1alpha.HealthCheckResponse{
+					Status: healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+				}
+			}
+		case config.Config.ModelBackend.Host:
+			resp, err := s.modelPublicClient.Liveness(ctx, &modelPB.LivenessRequest{})
+
+			if err != nil {
+				return err
+			}
+			healthcheck = *resp.GetHealthCheckResponse()
+		case config.Config.PipelineBackend.Host:
+			resp, err := s.pipelinePublicClient.Liveness(ctx, &pipelinePB.LivenessRequest{})
+
+			if err != nil {
+				return err
+			}
+			healthcheck = *resp.GetHealthCheckResponse()
+		case config.Config.MgmtBackend.Host:
+			resp, err := s.mgmtPublicClient.Liveness(ctx, &mgmtPB.LivenessRequest{})
+
+			if err != nil {
+				return err
+			}
+			healthcheck = *resp.GetHealthCheckResponse()
+		case config.Config.ConnectorBackend.Host:
+			resp, err := s.connectorPublicClient.Liveness(ctx, &connectorPB.LivenessRequest{})
+
+			if err != nil {
+				return err
+			}
+			healthcheck = *resp.GetHealthCheckResponse()
+		}
+
+		state := healthcheck.Status
+		switch healthcheck.Status {
+		case 0:
+			state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED
+		case 1:
+			state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_SERVING
+		case 2:
+			state = healthcheckv1alpha.HealthCheckResponse_SERVING_STATUS_NOT_SERVING
+		}
+
+		err := s.UpdateResourceState(&controllerPB.Resource{
+			Name: util.ConvertServiceToResourceName(hostname),
+			State: &controllerPB.Resource_BackendState{
+				BackendState: state,
+			},
+		})
+
+		if err != nil {
+			return err
+		}
+
+		resp, _ := s.GetResourceState(util.ConvertServiceToResourceName(hostname))
+
+		logger.Info(fmt.Sprintf("[Controller] Got %v", resp))
 	}
-
-	resp, _ := s.GetResourceState(util.ConvertServiceToResourceName(serviceName))
-
-	logger.Info(fmt.Sprintf("[Controller] Got %v", resp))
 
 	return nil
 }
@@ -389,6 +429,126 @@ func (s *service) ProbeModels() error {
 		logResp, _ := s.GetResourceState(util.ConvertModelToResourceName(modelInstance.Name))
 		logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 	}
+	return nil
+}
+
+func (s *service) ProbeSourceConnectors() error {
+	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
+	defer cancel()
+
+	resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{})
+
+	if err != nil {
+		return err
+	}
+
+	connectors := resp.SourceConnectors
+	nextPageToken := &resp.NextPageToken
+	totalSize := resp.TotalSize
+
+	for totalSize > repository.DefaultPageSize {
+		resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{
+			PageToken: nextPageToken,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		nextPageToken = &resp.NextPageToken
+		totalSize -= repository.DefaultPageSize
+		connectors = append(connectors, resp.SourceConnectors...)
+	}
+
+	for _, connector := range connectors {
+		resp, err := s.connectorPrivateClient.CheckSourceConnector(ctx, &connectorPB.CheckSourceConnectorRequest{
+			Name: connector.Name,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		if err := s.probeConnectors(connector.Name, resp.WorkflowId); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *service) ProbeDestinationConnectors() error {
+	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
+	defer cancel()
+
+	resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{})
+
+	if err != nil {
+		return err
+	}
+
+	connectors := resp.DestinationConnectors
+	nextPageToken := &resp.NextPageToken
+	totalSize := resp.TotalSize
+
+	for totalSize > repository.DefaultPageSize {
+		resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{
+			PageToken: nextPageToken,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		nextPageToken = &resp.NextPageToken
+		totalSize -= repository.DefaultPageSize
+		connectors = append(connectors, resp.DestinationConnectors...)
+	}
+
+	for _, connector := range connectors {
+		resp, err := s.connectorPrivateClient.CheckDestinationConnector(ctx, &connectorPB.CheckDestinationConnectorRequest{
+			Name: connector.Name,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		if err := s.probeConnectors(connector.Name, resp.WorkflowId); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *service) probeConnectors(connectorName string, workflowId string) error {
+	logger, _ := logger.GetZapLogger()
+
+	resourceName := util.ConvertConnectorToResourceName(connectorName)
+
+	if workflowId == "" {
+		if err := s.UpdateResourceState(&controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_ConnectorState{
+				ConnectorState: connectorPB.Connector_STATE_CONNECTED,
+			},
+		}); err != nil {
+			return err
+		}
+	} else {
+		if err := s.UpdateResourceWorkflowID(resourceName, workflowId); err != nil {
+			return err
+		}
+		if err := s.UpdateResourceState(&controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_ConnectorState{
+				ConnectorState: connectorPB.Connector_STATE_UNSPECIFIED,
+			},
+		}); err != nil {
+			return err
+		}
+	}
+	logResp, _ := s.GetResourceState(resourceName)
+	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 
 	return nil
 }

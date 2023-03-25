@@ -119,6 +119,9 @@ func main() {
 	pipelinePublicServiceClient, pipelinePublicServiceClientConn := external.InitPipelinePublicServiceClient()
 	defer pipelinePublicServiceClientConn.Close()
 
+	pipelinePrivateServiceClient, pipelinePrivateServiceClientConn := external.InitPipelinePrivateServiceClient()
+	defer pipelinePrivateServiceClientConn.Close()
+
 	modelPublicServiceClient, modelPublicServiceClientConn := external.InitModelPublicServiceClient()
 	defer modelPublicServiceClientConn.Close()
 
@@ -128,19 +131,30 @@ func main() {
 	connectorPublicServiceClient, connectorPublicServiceClientConn := external.InitConnectorPublicServiceClient()
 	defer connectorPublicServiceClientConn.Close()
 
+	connectorPrivateServiceClient, connectorPrivateServiceClientConn := external.InitConnectorPrivateServiceClient()
+	defer connectorPrivateServiceClientConn.Close()
+
 	etcdClient := external.InitEtcdServiceClient()
 	defer etcdClient.Close()
 
+	tritonClient, tritonClientConn := external.InitTritonServiceClient()
+	defer tritonClientConn.Close()
+
+	service := service.NewService(
+		*etcdClient,
+		tritonClient,
+		mgmtPublicServiceClient,
+		modelPublicServiceClient,
+		modelPrivateServiceClient,
+		pipelinePublicServiceClient,
+		pipelinePrivateServiceClient,
+		connectorPublicServiceClient,
+		connectorPrivateServiceClient,
+	)
+
 	controllerPB.RegisterControllerPrivateServiceServer(
 		grpcS, handler.NewPrivateHandler(
-			service.NewService(
-				*etcdClient,
-				modelPrivateServiceClient,
-				modelPublicServiceClient,
-				mgmtPublicServiceClient,
-				pipelinePublicServiceClient,
-				connectorPublicServiceClient,
-			),
+			service,
 		),
 	)
 
@@ -192,27 +206,24 @@ func main() {
 	logger.Info("gRPC server is running.")
 
 	go func() {
-		service := service.NewService(
-			*etcdClient,
-			modelPrivateServiceClient,
-			modelPublicServiceClient,
-			mgmtPublicServiceClient,
-			pipelinePublicServiceClient,
-			connectorPublicServiceClient,
-		)
 		logger.Info("[controller] control loop started")
 		for {
 			logger.Info("[Controller] --------------Start probing------------")
 			// Backend services
-			err := service.ProbeBackend(config.Config.ModelBackend.Host)
-			if err != nil {
+			if err := service.ProbeBackend(); err != nil {
 				logger.Error(err.Error())
 			}
 
 			// Models
-			err = service.ProbeModels()
+			if err := service.ProbeModels(); err != nil {
+				logger.Error(err.Error())
+			}
 
-			if err != nil {
+			// Connectors
+			if err := service.ProbeSourceConnectors(); err != nil {
+				logger.Error(err.Error())
+			}
+			if err := service.ProbeDestinationConnectors(); err != nil {
 				logger.Error(err.Error())
 			}
 
