@@ -28,7 +28,7 @@ func ConvertServiceToResourceName(serviceName string) string {
 }
 
 func ConvertWorkflfowToWorkflowResourceName(resourceName string) string {
-	resourceWorkflowID := fmt.Sprintf("%s/workflow", resourceName)
+	resourceWorkflowId := fmt.Sprintf("%s/workflow", resourceName)
 
-	return resourceWorkflowID
+	return resourceWorkflowId
 }

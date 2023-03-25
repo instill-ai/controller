@@ -27,10 +27,10 @@ type Service interface {
 	GetResourceState(resourceName string) (*controllerPB.Resource, error)
 	UpdateResourceState(resource *controllerPB.Resource) error
 	DeleteResourceState(resourceName string) error
-	GetResourceWorkflowID(resourceName string) (*string, error)
-	UpdateResourceWorkflowID(resourceName string, workflowID string) error
-	DeleteResourceWorkflowID(resourceName string) error
-	GetOperationInfo(workflowID string) (*longrunningpb.Operation, error)
+	GetResourceWorkflowId(resourceName string) (*string, error)
+	UpdateResourceWorkflowId(resourceName string, workflowId string) error
+	DeleteResourceWorkflowId(resourceName string) error
+	GetOperationInfo(workflowId string, resourceType string) (*longrunningpb.Operation, error)
 	ProbeBackend() error
 	ProbeModels() error
 	ProbeSourceConnectors() error
@@ -133,7 +133,7 @@ func (s *service) UpdateResourceState(resource *controllerPB.Resource) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
-	workflowID, _ := s.GetResourceWorkflowID(resource.Name)
+	workflowId, _ := s.GetResourceWorkflowId(resource.Name)
 
 	resourceType := strings.SplitN(resource.Name, "/", 4)[3]
 
@@ -152,8 +152,9 @@ func (s *service) UpdateResourceState(resource *controllerPB.Resource) error {
 		return fmt.Errorf("resource type not implemented")
 	}
 
-	if workflowID != nil {
-		opInfo, err := s.GetOperationInfo(*workflowID)
+	// only for models
+	if workflowId != nil {
+		opInfo, err := s.GetOperationInfo(*workflowId, resourceType)
 
 		if err != nil {
 			return err
@@ -197,7 +198,7 @@ func (s *service) DeleteResourceState(resourceName string) error {
 	return nil
 }
 
-func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
+func (s *service) GetResourceWorkflowId(resourceName string) (*string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
@@ -212,7 +213,7 @@ func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
 	kvs := resp.Kvs
 
 	if len(kvs) == 0 {
-		return nil, fmt.Errorf("workflowID not found in etcd storage")
+		return nil, fmt.Errorf("workflowId not found in etcd storage")
 	}
 
 	workflowId := string(kvs[0].Value[:])
@@ -220,13 +221,13 @@ func (s *service) GetResourceWorkflowID(resourceName string) (*string, error) {
 	return &workflowId, nil
 }
 
-func (s *service) UpdateResourceWorkflowID(resourceName string, workflowID string) error {
+func (s *service) UpdateResourceWorkflowId(resourceName string, workflowId string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
 	resourceWorkflowId := util.ConvertWorkflfowToWorkflowResourceName(resourceName)
 
-	_, err := s.etcdClient.Put(ctx, resourceWorkflowId, workflowID)
+	_, err := s.etcdClient.Put(ctx, resourceWorkflowId, workflowId)
 
 	if err != nil {
 		return err
@@ -235,7 +236,7 @@ func (s *service) UpdateResourceWorkflowID(resourceName string, workflowID strin
 	return nil
 }
 
-func (s *service) DeleteResourceWorkflowID(resourceName string) error {
+func (s *service) DeleteResourceWorkflowId(resourceName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Etcd.Timeout*time.Second)
 	defer cancel()
 
@@ -461,16 +462,29 @@ func (s *service) ProbeSourceConnectors() error {
 	}
 
 	for _, connector := range connectors {
-		resp, err := s.connectorPrivateClient.CheckSourceConnector(ctx, &connectorPB.CheckSourceConnectorRequest{
-			Name: connector.Name,
-		})
-
-		if err != nil {
-			return err
-		}
-
-		if err := s.probeConnectors(connector.Name, resp.WorkflowId); err != nil {
-			return err
+		resourceName := util.ConvertConnectorToResourceName(connector.Name)
+		workflowId, _ := s.GetResourceWorkflowId(resourceName)
+		// check if there is an ongoing workflow
+		if workflowId != nil {
+			opInfo, err := s.GetOperationInfo(*workflowId, util.RESOURCE_TYPE_SOURCE_CONNECTOR)
+			if err != nil {
+				return err
+			}
+			if err := s.updateRunningConnector(resourceName, *opInfo); err != nil {
+				return err
+			}
+			// if not trigger connector check workflow
+		} else {
+			resp, err := s.connectorPrivateClient.CheckSourceConnector(ctx, &connectorPB.CheckSourceConnectorRequest{
+				Name: connector.Name,
+			})
+			if err != nil {
+				return err
+			}
+			// non grpc/http connector, save workflowid
+			if err := s.updateStaleConnector(resourceName, resp.WorkflowId); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -505,37 +519,77 @@ func (s *service) ProbeDestinationConnectors() error {
 	}
 
 	for _, connector := range connectors {
-		resp, err := s.connectorPrivateClient.CheckDestinationConnector(ctx, &connectorPB.CheckDestinationConnectorRequest{
-			Name: connector.Name,
-		})
-
-		if err != nil {
-			return err
-		}
-
-		if err := s.probeConnectors(connector.Name, resp.WorkflowId); err != nil {
-			return err
+		resourceName := util.ConvertConnectorToResourceName(connector.Name)
+		workflowId, _ := s.GetResourceWorkflowId(resourceName)
+		// check if there is an ongoing workflow
+		if workflowId != nil {
+			opInfo, err := s.GetOperationInfo(*workflowId, util.RESOURCE_TYPE_DESTINATION_CONNECTOR)
+			if err != nil {
+				return err
+			}
+			if err := s.updateRunningConnector(resourceName, *opInfo); err != nil {
+				return err
+			}
+			// if not trigger connector check workflow
+		} else {
+			resp, err := s.connectorPrivateClient.CheckDestinationConnector(ctx, &connectorPB.CheckDestinationConnectorRequest{
+				Name: connector.Name,
+			})
+			if err != nil {
+				return err
+			}
+			// non grpc/http connector, save workflowid
+			if err := s.updateStaleConnector(resourceName, resp.WorkflowId); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (s *service) probeConnectors(connectorName string, workflowId string) error {
+func (s *service) updateRunningConnector(resourceName string, opInfo longrunningpb.Operation) error {
 	logger, _ := logger.GetZapLogger()
 
-	resourceName := util.ConvertConnectorToResourceName(connectorName)
-
-	if workflowId == "" {
+	// if workflow not done set unspecified
+	if !opInfo.Done {
 		if err := s.UpdateResourceState(&controllerPB.Resource{
 			Name: resourceName,
 			State: &controllerPB.Resource_ConnectorState{
-				ConnectorState: connectorPB.Connector_STATE_CONNECTED,
+				ConnectorState: connectorPB.Connector_STATE_UNSPECIFIED,
 			},
 		}); err != nil {
 			return err
 		}
+		// else extract result from opinfo and delete workflow in etcd
 	} else {
-		if err := s.UpdateResourceWorkflowID(resourceName, workflowId); err != nil {
+		stateInt, err := strconv.ParseInt(string(opInfo.GetResponse().Value[:]), 10, 32)
+		if err != nil {
+			return err
+		}
+		if err := s.UpdateResourceState(&controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_ConnectorState{
+				ConnectorState: connectorPB.Connector_State(stateInt),
+			},
+		}); err != nil {
+			return err
+		}
+		if err := s.DeleteResourceWorkflowId(resourceName); err != nil {
+			return err
+		}
+	}
+
+	logResp, _ := s.GetResourceState(resourceName)
+	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
+
+	return nil
+}
+
+func (s *service) updateStaleConnector(resourceName string, worflowId string) error {
+	logger, _ := logger.GetZapLogger()
+
+	if worflowId != "" {
+		if err := s.UpdateResourceWorkflowId(resourceName, worflowId); err != nil {
 			return err
 		}
 		if err := s.UpdateResourceState(&controllerPB.Resource{
@@ -546,24 +600,48 @@ func (s *service) probeConnectors(connectorName string, workflowId string) error
 		}); err != nil {
 			return err
 		}
+		// grpc/http are always connected
+	} else {
+		if err := s.UpdateResourceState(&controllerPB.Resource{
+			Name: resourceName,
+			State: &controllerPB.Resource_ConnectorState{
+				ConnectorState: connectorPB.Connector_STATE_CONNECTED,
+			},
+		}); err != nil {
+			return err
+		}
 	}
+
 	logResp, _ := s.GetResourceState(resourceName)
 	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 
 	return nil
 }
 
-func (s *service) GetOperationInfo(workflowID string) (*longrunningpb.Operation, error) {
+func (s *service) GetOperationInfo(workflowId string, resourceType string) (*longrunningpb.Operation, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
 	defer cancel()
 
-	operation, err := s.modelPublicClient.GetModelOperation(ctx, &modelPB.GetModelOperationRequest{
-		Name: fmt.Sprintf("operations/%s", workflowID),
-	})
+	var operation *longrunningpb.Operation
 
-	if err != nil {
-		return nil, err
+	switch resourceType {
+	case util.RESOURCE_TYPE_MODEL:
+		op, err := s.modelPublicClient.GetModelOperation(ctx, &modelPB.GetModelOperationRequest{
+			Name: fmt.Sprintf("operations/%s", workflowId),
+		})
+		if err != nil {
+			return nil, err
+		}
+		operation = op.Operation
+	case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
+		op, err := s.connectorPublicClient.GetOperation(ctx, &connectorPB.GetOperationRequest{
+			Name: fmt.Sprintf("operations/%s", workflowId),
+		})
+		if err != nil {
+			return nil, err
+		}
+		operation = op.Operation
 	}
 
-	return operation.Operation, nil
+	return operation, nil
 }
