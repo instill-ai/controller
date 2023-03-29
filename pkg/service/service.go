@@ -34,6 +34,7 @@ type Service interface {
 	ProbeModels() error
 	ProbeSourceConnectors() error
 	ProbeDestinationConnectors() error
+	ProbePipelines() error
 }
 
 type service struct {

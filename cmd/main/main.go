@@ -227,6 +227,11 @@ func main() {
 				logger.Error(err.Error())
 			}
 
+			// Pipelines
+			if err := service.ProbePipelines(); err != nil {
+				logger.Error(err.Error())
+			}
+
 			time.Sleep(config.Config.Server.LoopInterval * time.Second)
 		}
 	}()

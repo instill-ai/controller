@@ -21,6 +21,14 @@ func ConvertConnectorToResourceName(connectorName string) string {
 	return resourceName
 }
 
+func ConvertPipelineToResourceName(pipelineName string) string {
+	splitName := strings.SplitN(pipelineName, "/", 2)
+	pipelineType, name := splitName[0], splitName[1]
+	resourceName := fmt.Sprintf("resources/%s/types/%s", name, pipelineType)
+
+	return resourceName
+}
+
 func ConvertServiceToResourceName(serviceName string) string {
 	resourceName := fmt.Sprintf("resources/%s/types/%s", serviceName, RESOURCE_TYPE_SERVICE)
 
