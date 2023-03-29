@@ -27,7 +27,6 @@ WORKDIR /${SERVICE_NAME}
 COPY --from=docker:dind-rootless --chown=nonroot:nonroot /usr/local/bin/docker /usr/local/bin
 
 COPY --from=build --chown=nonroot:nonroot /src/config ./config
-COPY --from=build --chown=nonroot:nonroot /src/assets ./assets
 COPY --from=build --chown=nonroot:nonroot /src/release-please ./release-please
 
 COPY --from=build --chown=nonroot:nonroot /${SERVICE_NAME} ./
