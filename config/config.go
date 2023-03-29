@@ -77,15 +77,17 @@ type CacheConfig struct {
 
 // TritonServerConfig related to Triton server
 type TritonServerConfig struct {
+	Host       string `koanf:"host"`
 	GrpcURI    string `koanf:"grpcuri"`
 	ModelStore string `koanf:"modelstore"`
 }
 
 // ConnectorBackendConfig related to connector-backend
 type ConnectorBackendConfig struct {
-	Host  string `koanf:"host"`
-	Port  int    `koanf:"port"`
-	HTTPS struct {
+	Host        string `koanf:"host"`
+	PublicPort  int    `koanf:"publicport"`
+	PrivatePort int    `koanf:"privateport"`
+	HTTPS       struct {
 		Cert string `koanf:"cert"`
 		Key  string `koanf:"key"`
 	}
@@ -104,9 +106,10 @@ type ModelBackendConfig struct {
 
 // PipelineBackendConfig related to pipeline-backend
 type PipelineBackendConfig struct {
-	Host  string `koanf:"host"`
-	Port  int    `koanf:"port"`
-	HTTPS struct {
+	Host        string `koanf:"host"`
+	PublicPort  int    `koanf:"publicport"`
+	PrivatePort int    `koanf:"privateport"`
+	HTTPS       struct {
 		Cert string `koanf:"cert"`
 		Key  string `koanf:"key"`
 	}
@@ -114,9 +117,10 @@ type PipelineBackendConfig struct {
 
 // MgmtBackendConfig related to mgmt-backend
 type MgmtBackendConfig struct {
-	Host       string `koanf:"host"`
-	PublicPort int    `koanf:"publicport"`
-	HTTPS      struct {
+	Host        string `koanf:"host"`
+	PublicPort  int    `koanf:"publicport"`
+	PrivatePort int    `koanf:"privateport"`
+	HTTPS       struct {
 		Cert string `koanf:"cert"`
 		Key  string `koanf:"key"`
 	}

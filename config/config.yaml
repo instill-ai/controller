@@ -33,11 +33,13 @@ temporal:
   clientoptions:
     hostport: temporal:7233
 tritonserver:
+  host: triton-server
   grpcuri: triton-server:8001
   modelstore: /model-repository
 connectorbackend:
   host: connector-backend
-  port: 8082
+  publicport: 8082
+  privateport: 3082
   https:
     cert:
     key:
@@ -50,13 +52,15 @@ modelbackend:
     key:
 pipelinebackend:
   host: pipeline-backend
-  port: 8081
+  publicport: 8081
+  privateport: 3081
   https:
     cert:
     key:
 mgmtbackend:
   host: mgmt-backend
   publicport: 8084
+  privateport: 3084
   https:
     cert:
     key:

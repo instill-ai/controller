@@ -1,6 +1,4 @@
 ARG GOLANG_VERSION
-ARG UBUNTU_VERSION
-
 FROM --platform=$BUILDPLATFORM golang:${GOLANG_VERSION} AS build
 
 ARG SERVICE_NAME
@@ -18,26 +16,21 @@ RUN --mount=target=. --mount=type=cache,target=/root/.cache/go-build --mount=typ
 RUN mkdir /etc/vdp
 RUN mkdir /vdp
 
-FROM --platform=$BUILDPLATFORM ubuntu:${UBUNTU_VERSION}
+FROM gcr.io/distroless/base:nonroot
 
-# Need permission of /tmp folder for internal process such as store temporary files.
-RUN chown -R nobody:nogroup /tmp
-# Need permission of /nonexistent folder for HuggingFace internal process.
-RUN mkdir /nonexistent > /dev/null && chown -R nobody:nogroup /nonexistent
-
-USER nobody:nogroup
+USER nonroot:nonroot
 
 ARG SERVICE_NAME
 
 WORKDIR /${SERVICE_NAME}
 
-COPY --from=docker:dind-rootless --chown=nobody:nogroup /usr/local/bin/docker /usr/local/bin
+COPY --from=docker:dind-rootless --chown=nonroot:nonroot /usr/local/bin/docker /usr/local/bin
 
-COPY --from=build --chown=nobody:nogroup /src/config ./config
-COPY --from=build --chown=nobody:nogroup /src/assets ./assets
-COPY --from=build --chown=nobody:nogroup /src/release-please ./release-please
+COPY --from=build --chown=nonroot:nonroot /src/config ./config
+COPY --from=build --chown=nonroot:nonroot /src/assets ./assets
+COPY --from=build --chown=nonroot:nonroot /src/release-please ./release-please
 
-COPY --from=build --chown=nobody:nogroup /${SERVICE_NAME} ./
+COPY --from=build --chown=nonroot:nonroot /${SERVICE_NAME} ./
 
-COPY --from=build --chown=nobody:nogroup /etc/vdp /etc/vdp
-COPY --from=build --chown=nobody:nogroup /vdp /vdp
+COPY --from=build --chown=nonroot:nonroot /etc/vdp /etc/vdp
+COPY --from=build --chown=nonroot:nonroot /vdp /vdp

@@ -53,7 +53,7 @@ func (h *PrivateHandler) GetResource(ctx context.Context, req *controllerPB.GetR
 
 func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.UpdateResourceRequest) (*controllerPB.UpdateResourceResponse, error) {
 	if req.WorkflowId != nil {
-		err := h.service.UpdateResourceWorkflowID(req.Resource.Name, *req.WorkflowId)
+		err := h.service.UpdateResourceWorkflowId(req.Resource.Name, *req.WorkflowId)
 
 		if err != nil {
 			return nil, err
@@ -77,7 +77,7 @@ func (h *PrivateHandler) DeleteResource(ctx context.Context, req *controllerPB.D
 		return nil, err
 	}
 
-	err = h.service.DeleteResourceWorkflowID(req.Name)
+	err = h.service.DeleteResourceWorkflowId(req.Name)
 
 	if err != nil {
 		return nil, err

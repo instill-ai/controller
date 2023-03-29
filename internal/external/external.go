@@ -78,13 +78,37 @@ func InitConnectorPublicServiceClient() (connectorPB.ConnectorPublicServiceClien
 		clientDialOpts = grpc.WithTransportCredentials(insecure.NewCredentials())
 	}
 
-	clientConn, err := grpc.Dial(fmt.Sprintf("%v:%v", config.Config.ConnectorBackend.Host, config.Config.ConnectorBackend.Port), clientDialOpts)
+	clientConn, err := grpc.Dial(fmt.Sprintf("%v:%v", config.Config.ConnectorBackend.Host, config.Config.ConnectorBackend.PublicPort), clientDialOpts)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, nil
 	}
 
 	return connectorPB.NewConnectorPublicServiceClient(clientConn), clientConn
+}
+
+// InitConnectorPrivateServiceClient initialises a ConnectorPrivateServiceClient instance
+func InitConnectorPrivateServiceClient() (connectorPB.ConnectorPrivateServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger()
+
+	var clientDialOpts grpc.DialOption
+	if config.Config.ConnectorBackend.HTTPS.Cert != "" && config.Config.ConnectorBackend.HTTPS.Key != "" {
+		creds, err := credentials.NewServerTLSFromFile(config.Config.ConnectorBackend.HTTPS.Cert, config.Config.ConnectorBackend.HTTPS.Key)
+		if err != nil {
+			logger.Fatal(err.Error())
+		}
+		clientDialOpts = grpc.WithTransportCredentials(creds)
+	} else {
+		clientDialOpts = grpc.WithTransportCredentials(insecure.NewCredentials())
+	}
+
+	clientConn, err := grpc.Dial(fmt.Sprintf("%v:%v", config.Config.ConnectorBackend.Host, config.Config.ConnectorBackend.PrivatePort), clientDialOpts)
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, nil
+	}
+
+	return connectorPB.NewConnectorPrivateServiceClient(clientConn), clientConn
 }
 
 // InitModelPublicServiceClient initialises a ModelPublicServiceClient instance
@@ -178,11 +202,37 @@ func InitPipelinePublicServiceClient() (pipelinePB.PipelinePublicServiceClient, 
 		clientDialOpts = grpc.WithTransportCredentials(insecure.NewCredentials())
 	}
 
-	clientConn, err := grpc.Dial(fmt.Sprintf("%v:%v", config.Config.PipelineBackend.Host, config.Config.PipelineBackend.Port), clientDialOpts)
+	clientConn, err := grpc.Dial(fmt.Sprintf("%v:%v", config.Config.PipelineBackend.Host, config.Config.PipelineBackend.PublicPort), clientDialOpts)
 	if err != nil {
 		logger.Error(err.Error())
 		return nil, nil
 	}
 
 	return pipelinePB.NewPipelinePublicServiceClient(clientConn), clientConn
+}
+
+// InitPipelinePrivateServiceClient initialises a PipelinePrivateServiceClient instance
+func InitPipelinePrivateServiceClient() (pipelinePB.PipelinePrivateServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger()
+
+	var clientDialOpts grpc.DialOption
+	var creds credentials.TransportCredentials
+	var err error
+	if config.Config.PipelineBackend.HTTPS.Cert != "" && config.Config.PipelineBackend.HTTPS.Key != "" {
+		creds, err = credentials.NewServerTLSFromFile(config.Config.PipelineBackend.HTTPS.Cert, config.Config.PipelineBackend.HTTPS.Key)
+		if err != nil {
+			logger.Fatal(err.Error())
+		}
+		clientDialOpts = grpc.WithTransportCredentials(creds)
+	} else {
+		clientDialOpts = grpc.WithTransportCredentials(insecure.NewCredentials())
+	}
+
+	clientConn, err := grpc.Dial(fmt.Sprintf("%v:%v", config.Config.PipelineBackend.Host, config.Config.PipelineBackend.PrivatePort), clientDialOpts)
+	if err != nil {
+		logger.Error(err.Error())
+		return nil, nil
+	}
+
+	return pipelinePB.NewPipelinePrivateServiceClient(clientConn), clientConn
 }
