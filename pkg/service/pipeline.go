@@ -3,9 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/instill-ai/controller/config"
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
 	"github.com/instill-ai/model-backend/pkg/repository"
@@ -16,8 +14,7 @@ import (
 	pipelinePB "github.com/instill-ai/protogen-go/vdp/pipeline/v1alpha"
 )
 
-func (s *service) ProbePipelines() error {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
+func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc) error {
 	defer cancel()
 
 	logger, _ := logger.GetZapLogger()
@@ -37,7 +34,7 @@ func (s *service) ProbePipelines() error {
 	for totalSize > repository.DefaultPageSize {
 		resp, err := s.pipelinePrivateClient.ListPipelinesAdmin(ctx, &pipelinePB.ListPipelinesAdminRequest{
 			PageToken: nextPageToken,
-			View: pipelinePB.View_VIEW_FULL.Enum(),
+			View:      pipelinePB.View_VIEW_FULL.Enum(),
 		})
 
 		if err != nil {
@@ -61,17 +58,17 @@ func (s *service) ProbePipelines() error {
 
 		var resources []*controllerPB.Resource
 
-		sourceConnectorResource, err := s.GetResourceState(util.ConvertConnectorToResourceName(pipeline.Recipe.Source))
+		sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertConnectorToResourceName(pipeline.Recipe.Source))
 		if err != nil {
-			s.UpdateResourceState(&pipelineResource)
+			s.UpdateResourceState(ctx, &pipelineResource)
 			logger.Error("no record find for source connector")
 			return err
 		}
 		resources = append(resources, sourceConnectorResource)
 
-		destinationConnectorResource, err := s.GetResourceState(util.ConvertConnectorToResourceName(pipeline.Recipe.Destination))
+		destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertConnectorToResourceName(pipeline.Recipe.Destination))
 		if err != nil {
-			s.UpdateResourceState(&pipelineResource)
+			s.UpdateResourceState(ctx, &pipelineResource)
 			logger.Error("no record find for destination connector")
 			return err
 		}
@@ -79,9 +76,9 @@ func (s *service) ProbePipelines() error {
 
 		modelInstanceNames := pipeline.Recipe.ModelInstances
 		for _, modelInstanceName := range modelInstanceNames {
-			modelInstanceResource, err := s.GetResourceState(util.ConvertModelToResourceName(modelInstanceName))
+			modelInstanceResource, err := s.GetResourceState(ctx, util.ConvertModelToResourceName(modelInstanceName))
 			if err != nil {
-				s.UpdateResourceState(&pipelineResource)
+				s.UpdateResourceState(ctx, &pipelineResource)
 				logger.Error(fmt.Sprintf("no record find for model instance %v", modelInstanceName))
 				return err
 			}
@@ -90,7 +87,7 @@ func (s *service) ProbePipelines() error {
 		}
 
 		for _, r := range resources {
-			switch v := r.State.(type){
+			switch v := r.State.(type) {
 			case *controllerPB.Resource_ConnectorState:
 				switch v.ConnectorState {
 				case connectorPB.Connector_STATE_DISCONNECTED:
@@ -126,16 +123,16 @@ func (s *service) ProbePipelines() error {
 					continue
 				}
 			}
-			s.UpdateResourceState(&pipelineResource)
+			s.UpdateResourceState(ctx, &pipelineResource)
 			return nil
 		}
 
 		pipelineResource.State = &controllerPB.Resource_PipelineState{
 			PipelineState: pipelinePB.Pipeline_STATE_ACTIVE,
 		}
-		s.UpdateResourceState(&pipelineResource)
+		s.UpdateResourceState(ctx, &pipelineResource)
 
-		logResp, _ := s.GetResourceState(resourceName)
+		logResp, _ := s.GetResourceState(ctx, resourceName)
 		logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 	}
 	return nil

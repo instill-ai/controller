@@ -3,9 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/instill-ai/controller/config"
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
 	"github.com/instill-ai/model-backend/pkg/repository"
@@ -14,8 +12,7 @@ import (
 	modelPB "github.com/instill-ai/protogen-go/vdp/model/v1alpha"
 )
 
-func (s *service) ProbeModels() error {
-	ctx, cancel := context.WithTimeout(context.Background(), config.Config.Server.Timeout*time.Second)
+func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) error {
 	defer cancel()
 
 	logger, _ := logger.GetZapLogger()
@@ -85,7 +82,7 @@ func (s *service) ProbeModels() error {
 			return err
 		}
 
-		err = s.UpdateResourceState(&controllerPB.Resource{
+		err = s.UpdateResourceState(ctx, &controllerPB.Resource{
 			Name: util.ConvertModelToResourceName(modelInstance.Name),
 			State: &controllerPB.Resource_ModelInstanceState{
 				ModelInstanceState: resp.State,
@@ -96,7 +93,7 @@ func (s *service) ProbeModels() error {
 			return err
 		}
 
-		logResp, _ := s.GetResourceState(util.ConvertModelToResourceName(modelInstance.Name))
+		logResp, _ := s.GetResourceState(ctx, util.ConvertModelToResourceName(modelInstance.Name))
 		logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 	}
 	return nil
