@@ -41,7 +41,7 @@ export default function (data) {
     client.close();
   });
 
-  if (__ENV.MODE != "api-gateway" && __ENV.MODE != "localhost") {
+  if (__ENV.MODE != "api-gateway") {
     controller_service.CheckModelResource()
     controller_service.CheckSourceConnectorResource()
     controller_service.CheckDestinationConnectorResource()

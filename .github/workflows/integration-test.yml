@@ -102,7 +102,7 @@ jobs:
         run: |
           curl https://github.com/grafana/k6/releases/download/v${{ env.K6_VERSION }}/k6-v${{ env.K6_VERSION }}-linux-amd64.tar.gz -L | tar xvz --strip-components 1 && sudo cp k6 /usr/bin
 
-      - name: Checkout (connector)
+      - name: Checkout (controller)
         uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -158,10 +158,10 @@ jobs:
         run: |
           make integration-test MODE=localhost
 
-      - name: Checkout (controller)
+      - name: Checkout (connector)
         uses: actions/checkout@v3
         with:
-          repository: instill-ai/controller
+          repository: instill-ai/connector-backend
 
       - name: Load .env file
         uses: cardinalby/export-env-action@v2

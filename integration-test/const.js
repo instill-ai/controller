@@ -15,7 +15,7 @@ if (__ENV.MODE == "api-gateway") {
 } else if (__ENV.MODE == "localhost") {
   // localhost mode for GitHub Actions
   proto = "http"
-  pHost = cHost = mHost = tHost = mgHost = "localhost"
+  pHost = cHost = mHost = tHost = mgHost = ctHost = "localhost"
   pPrivatePort = 3081
   cPrivatePort = 3082
   mPrivatePort = 3083
