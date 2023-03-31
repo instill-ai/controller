@@ -229,4 +229,276 @@ func TestUpdateResourceState(t *testing.T) {
 
 		assert.NoError(t, err)
 	})
+
+	t.Run("model", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		mockCluster := NewMockCluster(ctrl)
+		mockKV := NewMockKV(ctrl)
+		mockLease := NewMockLease(ctrl)
+		mockWatcher := NewMockWatcher(ctrl)
+		mockAuth := NewMockAuth(ctrl)
+		mockMaintenance := NewMockMaintenance(ctrl)
+
+		mockEtcdClient := etcdv3.Client{
+			Cluster:     mockCluster,
+			KV:          mockKV,
+			Lease:       mockLease,
+			Watcher:     mockWatcher,
+			Auth:        mockAuth,
+			Maintenance: mockMaintenance,
+		}
+
+		resource := controllerPB.Resource{
+			Name: modelResourceName,
+			State: &controllerPB.Resource_ModelInstanceState{
+				ModelInstanceState: modelPB.ModelInstance_STATE_UNSPECIFIED,
+			},
+		}
+
+		mockKV.
+			EXPECT().
+			Get(ctx, fmt.Sprintf("%s/workflow", modelResourceName)).
+			Return(&etcdv3.GetResponse{}, nil).
+			Times(1)
+
+		mockKV.
+			EXPECT().
+			Put(ctx, modelResourceName, string("0")).
+			Return(&etcdv3.PutResponse{}, nil).
+			Times(1)
+
+		s := service.NewService(mockEtcdClient, nil, nil, nil, nil, nil, nil, nil, nil)
+
+		err := s.UpdateResourceState(ctx, &resource)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("connector", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		mockCluster := NewMockCluster(ctrl)
+		mockKV := NewMockKV(ctrl)
+		mockLease := NewMockLease(ctrl)
+		mockWatcher := NewMockWatcher(ctrl)
+		mockAuth := NewMockAuth(ctrl)
+		mockMaintenance := NewMockMaintenance(ctrl)
+
+		mockEtcdClient := etcdv3.Client{
+			Cluster:     mockCluster,
+			KV:          mockKV,
+			Lease:       mockLease,
+			Watcher:     mockWatcher,
+			Auth:        mockAuth,
+			Maintenance: mockMaintenance,
+		}
+
+		resource := controllerPB.Resource{
+			Name: connectorResourceName,
+			State: &controllerPB.Resource_ConnectorState{
+				ConnectorState: connectorPB.Connector_STATE_UNSPECIFIED,
+			},
+		}
+
+		mockKV.
+			EXPECT().
+			Get(ctx, fmt.Sprintf("%s/workflow", connectorResourceName)).
+			Return(&etcdv3.GetResponse{}, nil).
+			Times(1)
+
+		mockKV.
+			EXPECT().
+			Put(ctx, connectorResourceName, string("0")).
+			Return(&etcdv3.PutResponse{}, nil).
+			Times(1)
+
+		s := service.NewService(mockEtcdClient, nil, nil, nil, nil, nil, nil, nil, nil)
+
+		err := s.UpdateResourceState(ctx, &resource)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("pipeline", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		mockCluster := NewMockCluster(ctrl)
+		mockKV := NewMockKV(ctrl)
+		mockLease := NewMockLease(ctrl)
+		mockWatcher := NewMockWatcher(ctrl)
+		mockAuth := NewMockAuth(ctrl)
+		mockMaintenance := NewMockMaintenance(ctrl)
+
+		mockEtcdClient := etcdv3.Client{
+			Cluster:     mockCluster,
+			KV:          mockKV,
+			Lease:       mockLease,
+			Watcher:     mockWatcher,
+			Auth:        mockAuth,
+			Maintenance: mockMaintenance,
+		}
+
+		resource := controllerPB.Resource{
+			Name: pipelineResourceName,
+			State: &controllerPB.Resource_PipelineState{
+				PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
+			},
+		}
+
+		mockKV.
+			EXPECT().
+			Get(ctx, fmt.Sprintf("%s/workflow", pipelineResourceName)).
+			Return(&etcdv3.GetResponse{}, nil).
+			Times(1)
+
+		mockKV.
+			EXPECT().
+			Put(ctx, pipelineResourceName, string("0")).
+			Return(&etcdv3.PutResponse{}, nil).
+			Times(1)
+
+		s := service.NewService(mockEtcdClient, nil, nil, nil, nil, nil, nil, nil, nil)
+
+		err := s.UpdateResourceState(ctx, &resource)
+
+		assert.NoError(t, err)
+	})
+}
+
+func TestDeleteResourceState(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	t.Run("service", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		mockCluster := NewMockCluster(ctrl)
+		mockKV := NewMockKV(ctrl)
+		mockLease := NewMockLease(ctrl)
+		mockWatcher := NewMockWatcher(ctrl)
+		mockAuth := NewMockAuth(ctrl)
+		mockMaintenance := NewMockMaintenance(ctrl)
+
+		mockEtcdClient := etcdv3.Client{
+			Cluster:     mockCluster,
+			KV:          mockKV,
+			Lease:       mockLease,
+			Watcher:     mockWatcher,
+			Auth:        mockAuth,
+			Maintenance: mockMaintenance,
+		}
+
+		var resp *etcdv3.DeleteResponse
+
+		mockKV.
+			EXPECT().
+			Delete(ctx, serviceResourceName).
+			Return(resp, nil).
+			Times(1)
+
+		s := service.NewService(mockEtcdClient, nil, nil, nil, nil, nil, nil, nil, nil)
+
+		err := s.DeleteResourceState(ctx, serviceResourceName)
+
+		assert.NoError(t, err)
+	})
+	t.Run("model", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		mockCluster := NewMockCluster(ctrl)
+		mockKV := NewMockKV(ctrl)
+		mockLease := NewMockLease(ctrl)
+		mockWatcher := NewMockWatcher(ctrl)
+		mockAuth := NewMockAuth(ctrl)
+		mockMaintenance := NewMockMaintenance(ctrl)
+
+		mockEtcdClient := etcdv3.Client{
+			Cluster:     mockCluster,
+			KV:          mockKV,
+			Lease:       mockLease,
+			Watcher:     mockWatcher,
+			Auth:        mockAuth,
+			Maintenance: mockMaintenance,
+		}
+
+		var resp *etcdv3.DeleteResponse
+
+		mockKV.
+			EXPECT().
+			Delete(ctx, modelResourceName).
+			Return(resp, nil).
+			Times(1)
+
+		s := service.NewService(mockEtcdClient, nil, nil, nil, nil, nil, nil, nil, nil)
+
+		err := s.DeleteResourceState(ctx, modelResourceName)
+
+		assert.NoError(t, err)
+	})
+	t.Run("connector", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		mockCluster := NewMockCluster(ctrl)
+		mockKV := NewMockKV(ctrl)
+		mockLease := NewMockLease(ctrl)
+		mockWatcher := NewMockWatcher(ctrl)
+		mockAuth := NewMockAuth(ctrl)
+		mockMaintenance := NewMockMaintenance(ctrl)
+
+		mockEtcdClient := etcdv3.Client{
+			Cluster:     mockCluster,
+			KV:          mockKV,
+			Lease:       mockLease,
+			Watcher:     mockWatcher,
+			Auth:        mockAuth,
+			Maintenance: mockMaintenance,
+		}
+
+		var resp *etcdv3.DeleteResponse
+
+		mockKV.
+			EXPECT().
+			Delete(ctx, connectorResourceName).
+			Return(resp, nil).
+			Times(1)
+
+		s := service.NewService(mockEtcdClient, nil, nil, nil, nil, nil, nil, nil, nil)
+
+		err := s.DeleteResourceState(ctx, connectorResourceName)
+
+		assert.NoError(t, err)
+	})
+	t.Run("pipeline", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		mockCluster := NewMockCluster(ctrl)
+		mockKV := NewMockKV(ctrl)
+		mockLease := NewMockLease(ctrl)
+		mockWatcher := NewMockWatcher(ctrl)
+		mockAuth := NewMockAuth(ctrl)
+		mockMaintenance := NewMockMaintenance(ctrl)
+
+		mockEtcdClient := etcdv3.Client{
+			Cluster:     mockCluster,
+			KV:          mockKV,
+			Lease:       mockLease,
+			Watcher:     mockWatcher,
+			Auth:        mockAuth,
+			Maintenance: mockMaintenance,
+		}
+
+		var resp *etcdv3.DeleteResponse
+
+		mockKV.
+			EXPECT().
+			Delete(ctx, pipelineResourceName).
+			Return(resp, nil).
+			Times(1)
+
+		s := service.NewService(mockEtcdClient, nil, nil, nil, nil, nil, nil, nil, nil)
+
+		err := s.DeleteResourceState(ctx, pipelineResourceName)
+
+		assert.NoError(t, err)
+	})
 }

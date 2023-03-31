@@ -147,7 +147,7 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 	}
 
 	// only for models
-	if workflowId != nil {
+	if len(*workflowId) > 1 {
 		opInfo, err := s.getOperationInfo(*workflowId, resourceType)
 
 		if err != nil {
