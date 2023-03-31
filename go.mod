@@ -10,7 +10,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.14.0
 	github.com/instill-ai/model-backend v0.13.1-alpha
 	github.com/instill-ai/pipeline-backend v0.9.8-alpha
-	github.com/instill-ai/protogen-go v0.3.3-alpha.0.20230329112911-d3741ca31777
+	github.com/instill-ai/protogen-go v0.3.3-alpha.0.20230329021956-5f3a3104f4cb
 	github.com/instill-ai/x v0.2.0-alpha
 	github.com/knadh/koanf v1.5.0
 	github.com/redis/go-redis/v9 v9.0.2
@@ -57,8 +57,6 @@ require (
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.1.1 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.7 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.7 // indirect
 	go.temporal.io/api v1.13.0 // indirect
 	go.temporal.io/sdk v1.19.0 // indirect

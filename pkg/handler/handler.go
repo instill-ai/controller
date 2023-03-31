@@ -24,7 +24,7 @@ func NewPrivateHandler(s service.Service) controllerPB.ControllerPrivateServiceS
 func (h *PrivateHandler) Liveness(ctx context.Context, in *controllerPB.LivenessRequest) (*controllerPB.LivenessResponse, error) {
 	return &controllerPB.LivenessResponse{
 		HealthCheckResponse: &healthcheckPB.HealthCheckResponse{
-			Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+			Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_SERVING,
 		},
 	}, nil
 

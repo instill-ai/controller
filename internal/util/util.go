@@ -8,7 +8,7 @@ import (
 func ConvertModelToResourceName(modelInstanceName string) string {
 	splitName := strings.SplitN(modelInstanceName, "/", 4)
 	modelType, modelID, modelInstanceID := splitName[0], splitName[1], splitName[3]
-	resourceName := fmt.Sprintf("resources/%s_%s/types/%s", modelID, modelInstanceID, modelType)
+	resourceName := fmt.Sprintf("resources/%s-%s/types/%s", modelID, modelInstanceID, modelType)
 
 	return resourceName
 }
