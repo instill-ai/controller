@@ -1,4 +1,5 @@
 # controller
+[![Integration Test](https://github.com/instill-ai/controller/actions/workflows/integration-test.yml/badge.svg)](https://github.com/instill-ai/controller/actions/workflows/integration-test.yml)
 
 `controller` service monitors the state of other services and resources within [Versatile Data Pipeline (VDP)](https://github.com/instill-ai/vdp).
 

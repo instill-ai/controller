@@ -52,14 +52,14 @@ go-gen:       					## Generate codes
 
 .PHONY: unit-test
 unit-test:       				## Run unit test
-	@go test -v -race -coverpkg=./... -coverprofile=coverage.out ./...
-	@go tool cover -func=coverage.out
-	@go tool cover -html=coverage.out
-	@rm coverage.out
+	@go test -v -race -coverpkg=./... -coverprofile=/vdp/coverage.out ./...
+	@go tool cover -func=/vdp/coverage.out
+	@go tool cover -html=/vdp/coverage.out
+	@rm /vdp/coverage.out
 
 .PHONY: integration-test
 integration-test:				## Run integration test
-	@TEST_FOLDER_ABS_PATH=${PWD} k6 run -e MODE=$(MODE) integration-test/rest.js --no-usage-report --quiet
+	@TEST_FOLDER_ABS_PATH=${PWD} k6 run -e MODE=$(MODE) integration-test/grpc.js --no-usage-report --quiet
 
 .PHONY: help
 help:       	 				## Show this help
