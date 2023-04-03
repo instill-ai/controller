@@ -22,69 +22,72 @@ export default function (data) {
   /*
    * Controller API - API CALLS
    */
+  if (__ENV.MODE != "api-gateway" && __ENV.MODE != "localhost") {
+    // Health check
+    group("Controller API: Health check", () => {
+      client.connect(constant.controllerGRPCPrivateHost, {
+        plaintext: true
+      });
 
-  // Health check
-  group("Controller API: Health check", () => {
-    client.connect(constant.controllerGRPCPrivateHost, {
-      plaintext: true
+      check(client.invoke('vdp.controller.v1alpha.ControllerPrivateService/Liveness', {}), {
+        'Liveness Status is OK': (r) => r && r.status === grpc.StatusOK,
+        'Response status is SERVING_STATUS_SERVING': (r) => r && r.message.healthCheckResponse.status === "SERVING_STATUS_SERVING",
+      });
+
+      check(client.invoke('vdp.controller.v1alpha.ControllerPrivateService/Readiness', {}), {
+        'Readiness Status is OK': (r) => r && r.status === grpc.StatusOK,
+        'Response status is SERVING_STATUS_SERVING': (r) => r && r.message.healthCheckResponse.status === "SERVING_STATUS_SERVING",
+      });
+      client.close();
     });
 
-    check(client.invoke('vdp.controller.v1alpha.ControllerPrivateService/Liveness', {}), {
-      'Liveness Status is OK': (r) => r && r.status === grpc.StatusOK,
-      'Response status is SERVING_STATUS_SERVING': (r) => r && r.message.healthCheckResponse.status === "SERVING_STATUS_SERVING",
-    });
-
-    check(client.invoke('vdp.controller.v1alpha.ControllerPrivateService/Readiness', {}), {
-      'Readiness Status is OK': (r) => r && r.status === grpc.StatusOK,
-      'Response status is SERVING_STATUS_SERVING': (r) => r && r.message.healthCheckResponse.status === "SERVING_STATUS_SERVING",
-    });
-    client.close();
-  });
-
-  if (__ENV.MODE != "api-gateway") {
     controller_service.CheckModelResource()
     controller_service.CheckSourceConnectorResource()
     controller_service.CheckDestinationConnectorResource()
     controller_service.CheckPipelineResource()
-
+    controller_service.CheckServiceResource()
   }
 }
 
 export function teardown(data) {
-  client.connect(constant.controllerGRPCPrivateHost, {
-    plaintext: true
-  });
-  group("Controller API: Delete all resources created by the test", () => {
-
-    check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-      name: constant.modelResourceName
-    }), {
-      [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.modelResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+  if (__ENV.MODE != "api-gateway" && __ENV.MODE != "localhost") {
+    client.connect(constant.controllerGRPCPrivateHost, {
+      plaintext: true
     });
+    group("Controller API: Delete all resources created by the test", () => {
 
-    check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-      name: constant.sourceConnectorResourceName
-    }), {
-      [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.sourceConnectorResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-    });
+      check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
+        name: constant.modelResourceName
+      }), {
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.modelResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+      });
 
-    check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-      name: constant.destinationConnectorResourceName
-    }), {
-      [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.destinationConnectorResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-    });
+      check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
+        name: constant.sourceConnectorResourceName
+      }), {
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.sourceConnectorResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+      });
 
-    check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-      name: constant.pipelineResourceName
-    }), {
-      [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.pipelineResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-    });
+      check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
+        name: constant.destinationConnectorResourceName
+      }), {
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.destinationConnectorResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+      });
 
-    check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-      name: constant.serviceResourceName
-    }), {
-      [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.serviceResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+      check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
+        name: constant.pipelineResourceName
+      }), {
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.pipelineResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+      });
+
+      check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
+        name: constant.serviceResourceName
+      }), {
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.serviceResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+      });
     });
-  });
-  client.close();
+    client.close();
+  } else {
+    console.log("No Public APIs")
+  }
 }

@@ -147,31 +147,33 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 	}
 
 	// only for models
-	if len(*workflowId) > 1 {
-		opInfo, err := s.getOperationInfo(*workflowId, resourceType)
+	if workflowId != nil {
+		if len(*workflowId) > 1 {
+			opInfo, err := s.getOperationInfo(*workflowId, resourceType)
 
-		if err != nil {
-			return err
-		}
+			if err != nil {
+				return err
+			}
 
-		if opInfo != nil {
+			if opInfo != nil {
 
-			if !opInfo.Done {
-				switch resourceType {
-				case util.RESOURCE_TYPE_MODEL:
-					state = int(modelPB.ModelInstance_STATE_UNSPECIFIED)
-				case util.RESOURCE_TYPE_PIPELINE:
-					state = int(pipelinePB.Pipeline_STATE_UNSPECIFIED)
-				case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
-					state = int(connectorPB.Connector_STATE_UNSPECIFIED)
-				case util.RESOURCE_TYPE_SERVICE:
-					state = int(healthcheckPB.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED)
-				default:
-					return fmt.Errorf(fmt.Sprintf("resource type %s not implemented", resourceType))
-				}
-			} else {
-				if err := s.DeleteResourceWorkflowId(ctx, resource.Name); err != nil {
-					return err
+				if !opInfo.Done {
+					switch resourceType {
+					case util.RESOURCE_TYPE_MODEL:
+						state = int(modelPB.ModelInstance_STATE_UNSPECIFIED)
+					case util.RESOURCE_TYPE_PIPELINE:
+						state = int(pipelinePB.Pipeline_STATE_UNSPECIFIED)
+					case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
+						state = int(connectorPB.Connector_STATE_UNSPECIFIED)
+					case util.RESOURCE_TYPE_SERVICE:
+						state = int(healthcheckPB.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED)
+					default:
+						return fmt.Errorf(fmt.Sprintf("resource type %s not implemented", resourceType))
+					}
+				} else {
+					if err := s.DeleteResourceWorkflowId(ctx, resource.Name); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -263,61 +265,66 @@ func (s *service) ProbeBackend(ctx context.Context, cancel context.CancelFunc) e
 			resp, err := s.tritonClient.ServerLive(ctx, &inferenceserver.ServerLiveRequest{})
 
 			if err != nil {
-				return err
-			}
-			if resp.GetLive() {
-				healthcheck = healthcheckPB.HealthCheckResponse{
-					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_SERVING,
-				}
-			} else {
 				healthcheck = healthcheckPB.HealthCheckResponse{
 					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+				}
+			} else {
+				if resp.GetLive() {
+					healthcheck = healthcheckPB.HealthCheckResponse{
+						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_SERVING,
+					}
+				} else {
+					healthcheck = healthcheckPB.HealthCheckResponse{
+						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+					}
 				}
 			}
 		case config.Config.ModelBackend.Host:
 			resp, err := s.modelPublicClient.Liveness(ctx, &modelPB.LivenessRequest{})
 
 			if err != nil {
-				return err
+				healthcheck = healthcheckPB.HealthCheckResponse{
+					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+				}
+			} else {
+				healthcheck = *resp.GetHealthCheckResponse()
 			}
-			healthcheck = *resp.GetHealthCheckResponse()
 		case config.Config.PipelineBackend.Host:
 			resp, err := s.pipelinePublicClient.Liveness(ctx, &pipelinePB.LivenessRequest{})
 
 			if err != nil {
-				return err
+				healthcheck = healthcheckPB.HealthCheckResponse{
+					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+				}
+			} else {
+				healthcheck = *resp.GetHealthCheckResponse()
 			}
-			healthcheck = *resp.GetHealthCheckResponse()
 		case config.Config.MgmtBackend.Host:
 			resp, err := s.mgmtPublicClient.Liveness(ctx, &mgmtPB.LivenessRequest{})
 
 			if err != nil {
-				return err
+				healthcheck = healthcheckPB.HealthCheckResponse{
+					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+				}
+			} else {
+				healthcheck = *resp.GetHealthCheckResponse()
 			}
-			healthcheck = *resp.GetHealthCheckResponse()
 		case config.Config.ConnectorBackend.Host:
 			resp, err := s.connectorPublicClient.Liveness(ctx, &connectorPB.LivenessRequest{})
 
 			if err != nil {
-				return err
+				healthcheck = healthcheckPB.HealthCheckResponse{
+					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+				}
+			} else {
+				healthcheck = *resp.GetHealthCheckResponse()
 			}
-			healthcheck = *resp.GetHealthCheckResponse()
-		}
-
-		state := healthcheck.Status
-		switch healthcheck.Status {
-		case 0:
-			state = healthcheckPB.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED
-		case 1:
-			state = healthcheckPB.HealthCheckResponse_SERVING_STATUS_SERVING
-		case 2:
-			state = healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING
 		}
 
 		err := s.UpdateResourceState(ctx, &controllerPB.Resource{
 			Name: util.ConvertServiceToResourceName(hostname),
 			State: &controllerPB.Resource_BackendState{
-				BackendState: state,
+				BackendState: healthcheck.Status,
 			},
 		})
 

@@ -122,11 +122,11 @@ export function CheckPipelineResource() {
     });
 
     group("Controller API: Create pipeline resource state in etcd", () => {
-        var resCreatepipelineHTTP = clientPrivate.invoke('vdp.controller.v1alpha.ControllerPrivateService/UpdateResource', {
+        var resCreatePipelineHTTP = clientPrivate.invoke('vdp.controller.v1alpha.ControllerPrivateService/UpdateResource', {
             resource: httpPipelineResource
         })
 
-        check(resCreatepipelineHTTP, {
+        check(resCreatePipelineHTTP, {
             "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response StatusOK": (r) => r.status === grpc.StatusOK,
             "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response pipeline name matched": (r) => r.message.resource.name == httpPipelineResource.name,
         });
@@ -137,12 +137,44 @@ export function CheckPipelineResource() {
             name: httpPipelineResource.name
         })
 
-        console.log(resGetPipelineHTTP)
-
         check(resGetPipelineHTTP, {
             [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.name} response StatusOK`]: (r) => r.status === grpc.StatusOK,
             [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.name} response pipeline name matched`]: (r) => r.message.resource.name === httpPipelineResource.name,
             [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.name} response pipeline state matched STATE_ACTIVE`]: (r) => r.message.resource.pipelineState == "STATE_ACTIVE",
+        });
+    });
+}
+
+export function CheckServiceResource() {
+    var httpServiceResource = {
+        "name": constant.serviceResourceName,
+        "backend_state": "SERVING_STATUS_SERVING"
+    }
+
+    clientPrivate.connect(constant.controllerGRPCPrivateHost, {
+        plaintext: true
+    });
+
+    group("Controller API: Create service resource state in etcd", () => {
+        var resCreateServiceHTTP = clientPrivate.invoke('vdp.controller.v1alpha.ControllerPrivateService/UpdateResource', {
+            resource: httpServiceResource
+        })
+
+        check(resCreateServiceHTTP, {
+            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response StatusOK": (r) => r.status === grpc.StatusOK,
+            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response service name matched": (r) => r.message.resource.name == httpServiceResource.name,
+        });
+    });
+
+    group("Controller API: Get service resource state in etcd", () => {
+        var resGetServiceHTTP = clientPrivate.invoke(`vdp.controller.v1alpha.ControllerPrivateService/GetResource`, {
+            name: httpServiceResource.name
+        })
+
+        check(resGetServiceHTTP, {
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.name} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.name} response service name matched`]: (r) => r.message.resource.name === httpServiceResource.name,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.name} response service state matched STATE_ACTIVE`]: (r) => r.message.resource.backendState == "SERVING_STATUS_SERVING",
         });
     });
 }
