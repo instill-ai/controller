@@ -78,14 +78,15 @@ jobs:
           context: .
           load: true
           build-args: |
-            SERVICE_NAME=controller
+            SERVICE_NAME=${{ env.SERVICE_NAME }}
             GOLANG_VERSION=${{ env.GOLANG_VERSION }}
-          tags: instill/controller:latest
+          tags: instill/${{ env.SERVICE_NAME }}:latest
 
       - name: Checkout (vdp)
         uses: actions/checkout@v3
         with:
           repository: instill-ai/vdp
+          ref: heiru/ins-374-add-newly-introduced-etcdcontroller-vdp
 
       - name: Launch VDP
         run: |
@@ -112,9 +113,9 @@ jobs:
         with:
           envFile: .env
 
-      - name: Run integration-test container mode
+      - name: Run integration-test
         run: |
-          make integration-test
+          make integration-test MODE=localhost
 
       - name: Checkout (pipeline)
         uses: actions/checkout@v3

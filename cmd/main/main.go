@@ -210,20 +210,25 @@ func main() {
 		for {
 			logger.Info("[Controller] --------------Start probing------------")
 			// Backend services
-			if err := service.ProbeBackend(); err != nil {
+			if err := service.ProbeBackend(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
 				logger.Error(err.Error())
 			}
 
 			// Models
-			if err := service.ProbeModels(); err != nil {
+			if err := service.ProbeModels(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
 				logger.Error(err.Error())
 			}
 
 			// Connectors
-			if err := service.ProbeSourceConnectors(); err != nil {
+			if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
 				logger.Error(err.Error())
 			}
-			if err := service.ProbeDestinationConnectors(); err != nil {
+			if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+				logger.Error(err.Error())
+			}
+
+			// Pipelines
+			if err := service.ProbePipelines(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
 				logger.Error(err.Error())
 			}
 

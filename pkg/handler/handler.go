@@ -24,7 +24,7 @@ func NewPrivateHandler(s service.Service) controllerPB.ControllerPrivateServiceS
 func (h *PrivateHandler) Liveness(ctx context.Context, in *controllerPB.LivenessRequest) (*controllerPB.LivenessResponse, error) {
 	return &controllerPB.LivenessResponse{
 		HealthCheckResponse: &healthcheckPB.HealthCheckResponse{
-			Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+			Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_SERVING,
 		},
 	}, nil
 
@@ -40,7 +40,7 @@ func (h *PrivateHandler) Readiness(ctx context.Context, in *controllerPB.Readine
 }
 
 func (h *PrivateHandler) GetResource(ctx context.Context, req *controllerPB.GetResourceRequest) (*controllerPB.GetResourceResponse, error) {
-	resource, err := h.service.GetResourceState(req.Name)
+	resource, err := h.service.GetResourceState(ctx, req.Name)
 
 	if err != nil {
 		return nil, err
@@ -53,13 +53,13 @@ func (h *PrivateHandler) GetResource(ctx context.Context, req *controllerPB.GetR
 
 func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.UpdateResourceRequest) (*controllerPB.UpdateResourceResponse, error) {
 	if req.WorkflowId != nil {
-		err := h.service.UpdateResourceWorkflowId(req.Resource.Name, *req.WorkflowId)
+		err := h.service.UpdateResourceWorkflowId(ctx, req.Resource.Name, *req.WorkflowId)
 
 		if err != nil {
 			return nil, err
 		}
 	}
-	err := h.service.UpdateResourceState(req.Resource)
+	err := h.service.UpdateResourceState(ctx, req.Resource)
 
 	if err != nil {
 		return nil, err
@@ -71,13 +71,13 @@ func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.U
 }
 
 func (h *PrivateHandler) DeleteResource(ctx context.Context, req *controllerPB.DeleteResourceRequest) (*controllerPB.DeleteResourceResponse, error) {
-	err := h.service.DeleteResourceState(req.Name)
+	err := h.service.DeleteResourceState(ctx, req.Name)
 
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.service.DeleteResourceWorkflowId(req.Name)
+	err = h.service.DeleteResourceWorkflowId(ctx, req.Name)
 
 	if err != nil {
 		return nil, err

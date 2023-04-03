@@ -5,6 +5,7 @@ go 1.19
 require (
 	cloud.google.com/go/longrunning v0.3.0
 	github.com/gofrs/uuid v4.3.1+incompatible
+	github.com/golang/mock v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.14.0
 	github.com/instill-ai/model-backend v0.13.1-alpha
@@ -14,7 +15,9 @@ require (
 	github.com/knadh/koanf v1.5.0
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/rs/cors v1.8.2
+	github.com/stretchr/testify v1.8.1
 	go.einride.tech/aip v0.60.0
+	go.etcd.io/etcd/api/v3 v3.5.7
 	go.etcd.io/etcd/client/v3 v3.5.7
 	go.uber.org/zap v1.24.0
 	golang.org/x/net v0.7.0
@@ -38,7 +41,6 @@ require (
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gogo/status v1.1.1 // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -55,8 +57,6 @@ require (
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.1.1 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.7 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.7 // indirect
 	go.temporal.io/api v1.13.0 // indirect
 	go.temporal.io/sdk v1.19.0 // indirect
