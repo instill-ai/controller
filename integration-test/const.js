@@ -57,7 +57,7 @@ export const controllerPrivateHost = `${proto}://${ctHost}:${ctPrivatePort}`;
 export const controllerGRPCPrivateHost = `${ctHost}:${ctPrivatePort}`;
 
 export const modelResourceName = "resources/this-is-model-name/types/models"
-export const modelName = "models/this-is/instances/model-name"
+export const modelName = "models/model-name"
 
 export const sourceConnectorResourceName = "resources/source-connector-name/types/source-connectors"
 export const sourceConnectorName = "source-connectors/source-connector-name"

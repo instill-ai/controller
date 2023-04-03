@@ -8,7 +8,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
-	"github.com/instill-ai/model-backend/pkg/repository"
 
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
@@ -27,7 +26,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize > repository.DefaultPageSize {
+	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{
 			PageToken: nextPageToken,
 		})
@@ -37,7 +36,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize -= repository.DefaultPageSize
+		totalSize -= util.DefaultPageSize
 		connectors = append(connectors, resp.SourceConnectors...)
 	}
 
@@ -83,7 +82,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize > repository.DefaultPageSize {
+	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{
 			PageToken: nextPageToken,
 		})
@@ -93,7 +92,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize -= repository.DefaultPageSize
+		totalSize -= util.DefaultPageSize
 		connectors = append(connectors, resp.DestinationConnectors...)
 	}
 

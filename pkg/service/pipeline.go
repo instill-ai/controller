@@ -6,7 +6,6 @@ import (
 
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
-	"github.com/instill-ai/model-backend/pkg/repository"
 
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
@@ -31,7 +30,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize > repository.DefaultPageSize {
+	for totalSize > util.DefaultPageSize {
 		resp, err := s.pipelinePrivateClient.ListPipelinesAdmin(ctx, &pipelinePB.ListPipelinesAdminRequest{
 			PageToken: nextPageToken,
 			View:      pipelinePB.View_VIEW_FULL.Enum(),
@@ -42,7 +41,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize -= repository.DefaultPageSize
+		totalSize -= util.DefaultPageSize
 		pipelines = append(pipelines, resp.Pipelines...)
 	}
 

@@ -6,7 +6,6 @@ import (
 
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
-	"github.com/instill-ai/model-backend/pkg/repository"
 
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
 	modelPB "github.com/instill-ai/protogen-go/vdp/model/v1alpha"
@@ -27,7 +26,7 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize > repository.DefaultPageSize {
+	for totalSize > util.DefaultPageSize {
 		resp, err := s.modelPublicClient.ListModels(ctx, &modelPB.ListModelsRequest{
 			PageToken: nextPageToken,
 		})
@@ -37,7 +36,7 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize -= repository.DefaultPageSize
+		totalSize -= util.DefaultPageSize
 		models = append(models, resp.Models...)
 	}
 
