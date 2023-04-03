@@ -4,19 +4,15 @@ go 1.19
 
 require (
 	cloud.google.com/go/longrunning v0.3.0
-	github.com/gofrs/uuid v4.3.1+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.14.0
 	github.com/instill-ai/model-backend v0.13.1-alpha
-	github.com/instill-ai/pipeline-backend v0.9.8-alpha
 	github.com/instill-ai/protogen-go v0.3.3-alpha.0.20230402125221-c8f1a70b6b8b
-	github.com/instill-ai/x v0.2.0-alpha
 	github.com/knadh/koanf v1.5.0
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/rs/cors v1.8.2
 	github.com/stretchr/testify v1.8.1
-	go.einride.tech/aip v0.60.0
 	go.etcd.io/etcd/api/v3 v3.5.7
 	go.etcd.io/etcd/client/v3 v3.5.7
 	go.uber.org/zap v1.24.0
@@ -38,6 +34,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-redis/redis/v9 v9.0.0-rc.2 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
+	github.com/gofrs/uuid v4.3.1+incompatible // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gogo/status v1.1.1 // indirect
