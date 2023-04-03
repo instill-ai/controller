@@ -112,9 +112,9 @@ jobs:
         with:
           envFile: .env
 
-      - name: Run integration-test
+      - name: Run integration-test container mode
         run: |
-          make integration-test MODE=localhost
+          make integration-test
 
       - name: Checkout (pipeline)
         uses: actions/checkout@v3
