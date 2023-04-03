@@ -42,7 +42,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	}
 
 	for _, connector := range connectors {
-		resourceName := util.ConvertConnectorToResourceName(connector.Name)
+		resourceName := util.ConvertRequestToResourceName(connector.Name)
 		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
 		// check if there is an ongoing workflow
 		if workflowId != nil {
@@ -98,7 +98,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	}
 
 	for _, connector := range connectors {
-		resourceName := util.ConvertConnectorToResourceName(connector.Name)
+		resourceName := util.ConvertRequestToResourceName(connector.Name)
 		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
 		// check if there is an ongoing workflow
 		if workflowId != nil {

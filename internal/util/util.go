@@ -5,26 +5,10 @@ import (
 	"strings"
 )
 
-func ConvertModelToResourceName(modelInstanceName string) string {
-	splitName := strings.SplitN(modelInstanceName, "/", 4)
-	modelType, modelID, modelInstanceID := splitName[0], splitName[1], splitName[3]
-	resourceName := fmt.Sprintf("resources/%s-%s/types/%s", modelID, modelInstanceID, modelType)
-
-	return resourceName
-}
-
-func ConvertConnectorToResourceName(connectorName string) string {
-	splitName := strings.SplitN(connectorName, "/", 2)
-	connectorType, name := splitName[0], splitName[1]
-	resourceName := fmt.Sprintf("resources/%s/types/%s", name, connectorType)
-
-	return resourceName
-}
-
-func ConvertPipelineToResourceName(pipelineName string) string {
-	splitName := strings.SplitN(pipelineName, "/", 2)
-	pipelineType, name := splitName[0], splitName[1]
-	resourceName := fmt.Sprintf("resources/%s/types/%s", name, pipelineType)
+func ConvertRequestToResourceName(requestName string) string {
+	splitName := strings.SplitN(requestName, "/", 2)
+	resourceType, name := splitName[0], splitName[1]
+	resourceName := fmt.Sprintf("resources/%s/types/%s", name, resourceType)
 
 	return resourceName
 }

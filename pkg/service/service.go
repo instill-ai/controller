@@ -93,8 +93,8 @@ func (s *service) GetResourceState(ctx context.Context, resourceName string) (*c
 	case util.RESOURCE_TYPE_MODEL:
 		return &controllerPB.Resource{
 			Name: resourceName,
-			State: &controllerPB.Resource_ModelInstanceState{
-				ModelInstanceState: modelPB.ModelInstance_State(stateEnumValue),
+			State: &controllerPB.Resource_ModelState{
+				ModelState: modelPB.Model_State(stateEnumValue),
 			},
 			Progress: nil,
 		}, nil
@@ -135,7 +135,7 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 
 	switch resourceType {
 	case util.RESOURCE_TYPE_MODEL:
-		state = int(resource.GetModelInstanceState())
+		state = int(resource.GetModelState())
 	case util.RESOURCE_TYPE_PIPELINE:
 		state = int(resource.GetPipelineState())
 	case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
@@ -160,7 +160,7 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 				if !opInfo.Done {
 					switch resourceType {
 					case util.RESOURCE_TYPE_MODEL:
-						state = int(modelPB.ModelInstance_STATE_UNSPECIFIED)
+						state = int(modelPB.Model_STATE_UNSPECIFIED)
 					case util.RESOURCE_TYPE_PIPELINE:
 						state = int(pipelinePB.Pipeline_STATE_UNSPECIFIED)
 					case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:

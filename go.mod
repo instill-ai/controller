@@ -10,7 +10,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.14.0
 	github.com/instill-ai/model-backend v0.13.1-alpha
 	github.com/instill-ai/pipeline-backend v0.9.8-alpha
-	github.com/instill-ai/protogen-go v0.3.3-alpha.0.20230329021956-5f3a3104f4cb
+	github.com/instill-ai/protogen-go v0.3.3-alpha.0.20230402125221-c8f1a70b6b8b
 	github.com/instill-ai/x v0.2.0-alpha
 	github.com/knadh/koanf v1.5.0
 	github.com/redis/go-redis/v9 v9.0.2
