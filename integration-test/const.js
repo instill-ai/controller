@@ -50,7 +50,7 @@ export const pipelinePrivateHost = `${proto}://${pHost}:${pPrivatePort}`;
 export const modelPublicHost = `${proto}://${mHost}:${mPublicPort}`;
 export const modelPrivateHost = `${proto}://${mHost}:${mPrivatePort}`;
 export const mgmtPublicHost = `${proto}://${mgHost}:${mgPublicPort}`;
-export const mgmtPricateHost = `${proto}://${mgHost}:${mgPrivatePort}`;
+export const mgmtPrivateHost = `${proto}://${mgHost}:${mgPrivatePort}`;
 export const tritonPublicHost = `${proto}://${tHost}:${tPublicPort}`;
 export const controllerPrivateHost = `${proto}://${ctHost}:${ctPrivatePort}`;
 
