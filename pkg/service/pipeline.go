@@ -6,7 +6,6 @@ import (
 
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
-	"github.com/instill-ai/model-backend/pkg/repository"
 
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
@@ -31,7 +30,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize > repository.DefaultPageSize {
+	for totalSize > util.DefaultPageSize {
 		resp, err := s.pipelinePrivateClient.ListPipelinesAdmin(ctx, &pipelinePB.ListPipelinesAdminRequest{
 			PageToken: nextPageToken,
 			View:      pipelinePB.View_VIEW_FULL.Enum(),
@@ -42,12 +41,12 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize -= repository.DefaultPageSize
+		totalSize -= util.DefaultPageSize
 		pipelines = append(pipelines, resp.Pipelines...)
 	}
 
 	for _, pipeline := range pipelines {
-		resourceName := util.ConvertPipelineToResourceName(pipeline.Name)
+		resourceName := util.ConvertRequestToResourceName(pipeline.Name)
 
 		pipelineResource := controllerPB.Resource{
 			Name: resourceName,
@@ -58,7 +57,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 
 		var resources []*controllerPB.Resource
 
-		sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertConnectorToResourceName(pipeline.Recipe.Source))
+		sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Source))
 		if err != nil {
 			s.UpdateResourceState(ctx, &pipelineResource)
 			logger.Error("no record find for source connector")
@@ -66,7 +65,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		}
 		resources = append(resources, sourceConnectorResource)
 
-		destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertConnectorToResourceName(pipeline.Recipe.Destination))
+		destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Destination))
 		if err != nil {
 			s.UpdateResourceState(ctx, &pipelineResource)
 			logger.Error("no record find for destination connector")
@@ -74,16 +73,16 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		}
 		resources = append(resources, destinationConnectorResource)
 
-		modelInstanceNames := pipeline.Recipe.ModelInstances
-		for _, modelInstanceName := range modelInstanceNames {
-			modelInstanceResource, err := s.GetResourceState(ctx, util.ConvertModelToResourceName(modelInstanceName))
+		modelNames := pipeline.Recipe.Models
+		for _, modelName := range modelNames {
+			modelResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(modelName))
 			if err != nil {
 				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error(fmt.Sprintf("no record find for model instance %v", modelInstanceName))
+				logger.Error(fmt.Sprintf("no record find for model  %v", modelName))
 				return err
 			}
 
-			resources = append(resources, modelInstanceResource)
+			resources = append(resources, modelResource)
 		}
 
 		for _, r := range resources {
@@ -105,17 +104,17 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 				default:
 					continue
 				}
-			case *controllerPB.Resource_ModelInstanceState:
-				switch v.ModelInstanceState {
-				case modelPB.ModelInstance_STATE_OFFLINE:
+			case *controllerPB.Resource_ModelState:
+				switch v.ModelState {
+				case modelPB.Model_STATE_OFFLINE:
 					pipelineResource.State = &controllerPB.Resource_PipelineState{
 						PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
 					}
-				case modelPB.ModelInstance_STATE_UNSPECIFIED:
+				case modelPB.Model_STATE_UNSPECIFIED:
 					pipelineResource.State = &controllerPB.Resource_PipelineState{
 						PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
 					}
-				case modelPB.ModelInstance_STATE_ERROR:
+				case modelPB.Model_STATE_ERROR:
 					pipelineResource.State = &controllerPB.Resource_PipelineState{
 						PipelineState: pipelinePB.Pipeline_STATE_ERROR,
 					}

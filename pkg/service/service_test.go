@@ -106,7 +106,7 @@ func TestGetResourceState(t *testing.T) {
 
 		resource, err := s.GetResourceState(ctx, modelResourceName)
 
-		assert.Equal(t, modelPB.ModelInstance_STATE_UNSPECIFIED, resource.GetModelInstanceState())
+		assert.Equal(t, modelPB.Model_STATE_UNSPECIFIED, resource.GetModelState())
 
 		assert.NoError(t, err)
 	})
@@ -251,8 +251,8 @@ func TestUpdateResourceState(t *testing.T) {
 
 		resource := controllerPB.Resource{
 			Name: modelResourceName,
-			State: &controllerPB.Resource_ModelInstanceState{
-				ModelInstanceState: modelPB.ModelInstance_STATE_UNSPECIFIED,
+			State: &controllerPB.Resource_ModelState{
+				ModelState: modelPB.Model_STATE_UNSPECIFIED,
 			},
 		}
 

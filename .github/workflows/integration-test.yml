@@ -86,7 +86,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: instill-ai/vdp
-          ref: heiru/ins-374-add-newly-introduced-etcdcontroller-vdp
 
       - name: Launch VDP
         run: |

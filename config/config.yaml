@@ -6,7 +6,7 @@ server:
   corsorigins:
   edition: local-ce:dev
   disableusage: false
-  loopinterval: 5
+  loopinterval: 3
   timeout: 120
   debug: true
 etcd:

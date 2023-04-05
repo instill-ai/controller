@@ -8,7 +8,6 @@ import (
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
-	"github.com/instill-ai/model-backend/pkg/repository"
 
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
@@ -27,7 +26,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize > repository.DefaultPageSize {
+	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{
 			PageToken: nextPageToken,
 		})
@@ -37,12 +36,12 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize -= repository.DefaultPageSize
+		totalSize -= util.DefaultPageSize
 		connectors = append(connectors, resp.SourceConnectors...)
 	}
 
 	for _, connector := range connectors {
-		resourceName := util.ConvertConnectorToResourceName(connector.Name)
+		resourceName := util.ConvertRequestToResourceName(connector.Name)
 		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
 		// check if there is an ongoing workflow
 		if workflowId != nil {
@@ -83,7 +82,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	for totalSize > repository.DefaultPageSize {
+	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{
 			PageToken: nextPageToken,
 		})
@@ -93,12 +92,12 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 		}
 
 		nextPageToken = &resp.NextPageToken
-		totalSize -= repository.DefaultPageSize
+		totalSize -= util.DefaultPageSize
 		connectors = append(connectors, resp.DestinationConnectors...)
 	}
 
 	for _, connector := range connectors {
-		resourceName := util.ConvertConnectorToResourceName(connector.Name)
+		resourceName := util.ConvertRequestToResourceName(connector.Name)
 		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
 		// check if there is an ongoing workflow
 		if workflowId != nil {
@@ -117,7 +116,6 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 			if err != nil {
 				return err
 			}
-			// non grpc/http connector, save workflowid
 			if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
 				return err
 			}
@@ -156,7 +154,7 @@ func (s *service) updateRunningConnector(ctx context.Context, resourceName strin
 
 func (s *service) updateStaleConnector(ctx context.Context, resourceName string, workflowId string) error {
 	logger, _ := logger.GetZapLogger()
-
+	// non grpc/http connector, save workflowid
 	if workflowId != "" {
 		if err := s.UpdateResourceWorkflowId(ctx, resourceName, workflowId); err != nil {
 			return err

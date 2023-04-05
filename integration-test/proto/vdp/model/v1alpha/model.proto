@@ -400,7 +400,6 @@ message WatchModelResponse {
   // Retrieved model logrunning progress
   int32 progress = 2;
 }
-
 ////////////////////////////////////
 //  Trigger methods
 ////////////////////////////////////
