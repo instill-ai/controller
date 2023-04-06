@@ -42,6 +42,19 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 
 	for _, connector := range connectors {
 		resourceName := util.ConvertRequestToResourceName(connector.Name)
+
+		// if user desires disconnected
+		if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
+			if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
+				Name: resourceName,
+				State: &controllerPB.Resource_ConnectorState{
+					ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
+				},
+			}); err != nil {
+				return err
+			}
+		}
+		// if user desires connected
 		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
 		// check if there is an ongoing workflow
 		if workflowId != nil {
@@ -98,6 +111,19 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 
 	for _, connector := range connectors {
 		resourceName := util.ConvertRequestToResourceName(connector.Name)
+
+		// if user desires disconnected
+		if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
+			if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
+				Name: resourceName,
+				State: &controllerPB.Resource_ConnectorState{
+					ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
+				},
+			}); err != nil {
+				return err
+			}
+		}
+		// if user desires connected
 		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
 		// check if there is an ongoing workflow
 		if workflowId != nil {

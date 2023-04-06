@@ -51,9 +51,21 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		pipelineResource := controllerPB.Resource{
 			Name: resourceName,
 			State: &controllerPB.Resource_PipelineState{
-				PipelineState: pipelinePB.Pipeline_STATE_ERROR,
+				PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
 			},
 		}
+
+		// user desires inactive
+		if pipeline.State == pipelinePB.Pipeline_STATE_INACTIVE {
+			if err := s.UpdateResourceState(ctx, &pipelineResource); err != nil {
+				return err
+			} else {
+				return nil
+			}
+		}
+
+		// user desires active, now check each component's state
+		pipelineResource.State = &controllerPB.Resource_PipelineState{PipelineState: pipelinePB.Pipeline_STATE_ERROR}
 
 		var resources []*controllerPB.Resource
 
