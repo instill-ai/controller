@@ -1,17 +1,16 @@
 server:
-  port: 3085
+  privateport: 3085
   https:
     cert:
     key:
   corsorigins:
   edition: local-ce:dev
-  disableusage: false
   loopinterval: 3
   timeout: 120
   debug: true
 etcd:
   host: etcd
-  port: 2379
+  port: 3379
   timeout: 10
 database:
   username: postgres
@@ -64,7 +63,3 @@ mgmtbackend:
   https:
     cert:
     key:
-usageserver:
-  tlsenabled: true
-  host: usage.instill.tech
-  port: 443

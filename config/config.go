@@ -32,14 +32,13 @@ type AppConfig struct {
 
 // ServerConfig defines HTTP server configurations
 type ServerConfig struct {
-	Port  int `koanf:"port"`
+	Port  int `koanf:"privateport"`
 	HTTPS struct {
 		Cert string `koanf:"cert"`
 		Key  string `koanf:"key"`
 	}
 	CORSOrigins  []string      `koanf:"corsorigins"`
 	Edition      string        `koanf:"edition"`
-	DisableUsage bool          `koanf:"disableusage"`
 	Debug        bool          `koanf:"debug"`
 	LoopInterval time.Duration `koanf:"loopinterval"`
 	Timeout      time.Duration `koanf:"timeout"`
