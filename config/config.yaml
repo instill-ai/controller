@@ -10,7 +10,7 @@ server:
   debug: true
 etcd:
   host: etcd
-  port: 3379
+  port: 2379
   timeout: 10
 database:
   username: postgres
