@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/internal/logger"
@@ -16,6 +17,10 @@ import (
 func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.CancelFunc) error {
 	defer cancel()
 
+	logger, _ := logger.GetZapLogger()
+
+	var wg sync.WaitGroup
+
 	resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{})
 
 	if err != nil {
@@ -25,6 +30,8 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	connectors := resp.SourceConnectors
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
+
+	wg.Add(int(totalSize))
 
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{
@@ -41,49 +48,66 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	}
 
 	for _, connector := range connectors {
-		resourceName := util.ConvertRequestToResourceName(connector.Name)
 
-		// if user desires disconnected
-		if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
-			if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-				Name: resourceName,
-				State: &controllerPB.Resource_ConnectorState{
-					ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
-				},
-			}); err != nil {
-				return err
+		go func(connector *connectorPB.SourceConnector) {
+			defer wg.Done()
+
+			resourceName := util.ConvertRequestToResourceName(connector.Name)
+
+			// if user desires disconnected
+			if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
+				if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
+					Name: resourceName,
+					State: &controllerPB.Resource_ConnectorState{
+						ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
+					},
+				}); err != nil {
+					logger.Error(err.Error())
+					return
+				}
 			}
-		}
-		// if user desires connected
-		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
-		// check if there is an ongoing workflow
-		if workflowId != nil {
-			opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_SOURCE_CONNECTOR)
-			if err != nil {
-				return err
+			// if user desires connected
+			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
+			// check if there is an ongoing workflow
+			if workflowId != nil {
+				opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_SOURCE_CONNECTOR)
+				if err != nil {
+					logger.Error(err.Error())
+					return
+				}
+				if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
+					logger.Error(err.Error())
+					return
+				}
+				// if not trigger connector check workflow
+			} else {
+				resp, err := s.connectorPrivateClient.CheckSourceConnector(ctx, &connectorPB.CheckSourceConnectorRequest{
+					Name: connector.Name,
+				})
+				if err != nil {
+					logger.Error(err.Error())
+					return
+				}
+				// non grpc/http connector, save workflowid
+				if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
+					logger.Error(err.Error())
+					return
+				}
 			}
-			if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
-				return err
-			}
-			// if not trigger connector check workflow
-		} else {
-			resp, err := s.connectorPrivateClient.CheckSourceConnector(ctx, &connectorPB.CheckSourceConnectorRequest{
-				Name: connector.Name,
-			})
-			if err != nil {
-				return err
-			}
-			// non grpc/http connector, save workflowid
-			if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
-				return err
-			}
-		}
+		}(connector)
 	}
+
+	wg.Wait()
+
 	return nil
 }
 
 func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context.CancelFunc) error {
 	defer cancel()
+
+	logger, _ := logger.GetZapLogger()
+
+	var wg sync.WaitGroup
 
 	resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{})
 
@@ -94,6 +118,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	connectors := resp.DestinationConnectors
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
+	wg.Add(int(totalSize))
 
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{
@@ -110,43 +135,56 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	}
 
 	for _, connector := range connectors {
-		resourceName := util.ConvertRequestToResourceName(connector.Name)
 
-		// if user desires disconnected
-		if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
-			if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-				Name: resourceName,
-				State: &controllerPB.Resource_ConnectorState{
-					ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
-				},
-			}); err != nil {
-				return err
+		go func(connector *connectorPB.DestinationConnector) {
+			defer wg.Done()
+
+			resourceName := util.ConvertRequestToResourceName(connector.Name)
+
+			// if user desires disconnected
+			if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
+				if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
+					Name: resourceName,
+					State: &controllerPB.Resource_ConnectorState{
+						ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
+					},
+				}); err != nil {
+					logger.Error(err.Error())
+					return
+				}
 			}
-		}
-		// if user desires connected
-		workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
-		// check if there is an ongoing workflow
-		if workflowId != nil {
-			opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_DESTINATION_CONNECTOR)
-			if err != nil {
-				return err
+			// if user desires connected
+			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
+			// check if there is an ongoing workflow
+			if workflowId != nil {
+				opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_DESTINATION_CONNECTOR)
+				if err != nil {
+					logger.Error(err.Error())
+					return
+				}
+				if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
+					logger.Error(err.Error())
+					return
+				}
+				// if not trigger connector check workflow
+			} else {
+				resp, err := s.connectorPrivateClient.CheckDestinationConnector(ctx, &connectorPB.CheckDestinationConnectorRequest{
+					Name: connector.Name,
+				})
+				if err != nil {
+					logger.Error(err.Error())
+					return
+				}
+				if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
+					logger.Error(err.Error())
+					return
+				}
 			}
-			if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
-				return err
-			}
-			// if not trigger connector check workflow
-		} else {
-			resp, err := s.connectorPrivateClient.CheckDestinationConnector(ctx, &connectorPB.CheckDestinationConnectorRequest{
-				Name: connector.Name,
-			})
-			if err != nil {
-				return err
-			}
-			if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
-				return err
-			}
-		}
+		}(connector)
 	}
+
+	wg.Wait()
+
 	return nil
 }
 
