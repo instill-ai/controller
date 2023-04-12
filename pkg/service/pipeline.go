@@ -33,8 +33,6 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	wg.Add(int(totalSize))
-
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.pipelinePrivateClient.ListPipelinesAdmin(ctx, &pipelinePB.ListPipelinesAdminRequest{
 			PageToken: nextPageToken,
@@ -49,6 +47,8 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		totalSize -= util.DefaultPageSize
 		pipelines = append(pipelines, resp.Pipelines...)
 	}
+
+	wg.Add(len(pipelines))
 
 	for _, pipeline := range pipelines {
 
@@ -68,7 +68,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 			if pipeline.State == pipelinePB.Pipeline_STATE_INACTIVE {
 				if err := s.UpdateResourceState(ctx, &pipelineResource); err != nil {
 					logger.Error(err.Error())
-				return
+					return
 				} else {
 					return
 				}

@@ -118,7 +118,6 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	connectors := resp.DestinationConnectors
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
-	wg.Add(int(totalSize))
 
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{
@@ -133,6 +132,8 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 		totalSize -= util.DefaultPageSize
 		connectors = append(connectors, resp.DestinationConnectors...)
 	}
+
+	wg.Add(len(connectors))
 
 	for _, connector := range connectors {
 
