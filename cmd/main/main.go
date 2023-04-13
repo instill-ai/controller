@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -207,32 +208,52 @@ func main() {
 
 	go func() {
 		logger.Info("[controller] control loop started")
+		var mainWG sync.WaitGroup
 		for {
 			logger.Info("[Controller] --------------Start probing------------")
+
+			mainWG.Add(5)
+
 			// Backend services
-			if err := service.ProbeBackend(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-				logger.Error(err.Error())
-			}
+			go func() {
+				defer mainWG.Done()
+				if err := service.ProbeBackend(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+					logger.Error(err.Error())
+				}
+			}()
 
 			// Models
-			if err := service.ProbeModels(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-				logger.Error(err.Error())
-			}
+			go func() {
+				defer mainWG.Done()
+				if err := service.ProbeModels(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+					logger.Error(err.Error())
+				}
+			}()
 
 			// Connectors
-			if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-				logger.Error(err.Error())
-			}
-			if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-				logger.Error(err.Error())
-			}
+			go func() {
+				defer mainWG.Done()
+				if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+					logger.Error(err.Error())
+				}
+			}()
+			go func() {
+				defer mainWG.Done()
+				if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+					logger.Error(err.Error())
+				}
+			}()
 
 			// Pipelines
-			if err := service.ProbePipelines(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-				logger.Error(err.Error())
-			}
+			go func() {
+				defer mainWG.Done()
+				if err := service.ProbePipelines(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+					logger.Error(err.Error())
+				}
+			}()
 
 			time.Sleep(config.Config.Server.LoopInterval * time.Second)
+			mainWG.Wait()
 		}
 	}()
 

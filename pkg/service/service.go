@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
@@ -247,6 +248,8 @@ func (s *service) ProbeBackend(ctx context.Context, cancel context.CancelFunc) e
 
 	logger, _ := logger.GetZapLogger()
 
+	var wg sync.WaitGroup
+
 	healthcheck := healthcheckPB.HealthCheckResponse{
 		Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED,
 	}
@@ -259,83 +262,92 @@ func (s *service) ProbeBackend(ctx context.Context, cancel context.CancelFunc) e
 		config.Config.MgmtBackend.Host,
 	}
 
-	for _, hostname := range backenServices {
-		switch hostname {
-		case config.Config.TritonServer.Host:
-			resp, err := s.tritonClient.ServerLive(ctx, &inferenceserver.ServerLiveRequest{})
+	wg.Add(len(backenServices))
 
-			if err != nil {
-				healthcheck = healthcheckPB.HealthCheckResponse{
-					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
-				}
-			} else {
-				if resp.GetLive() {
-					healthcheck = healthcheckPB.HealthCheckResponse{
-						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_SERVING,
-					}
-				} else {
+	for _, hostname := range backenServices {
+		go func(hostname string) {
+			defer wg.Done()
+
+			switch hostname {
+			case config.Config.TritonServer.Host:
+				resp, err := s.tritonClient.ServerLive(ctx, &inferenceserver.ServerLiveRequest{})
+
+				if err != nil {
 					healthcheck = healthcheckPB.HealthCheckResponse{
 						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
 					}
+				} else {
+					if resp.GetLive() {
+						healthcheck = healthcheckPB.HealthCheckResponse{
+							Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_SERVING,
+						}
+					} else {
+						healthcheck = healthcheckPB.HealthCheckResponse{
+							Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+						}
+					}
+				}
+			case config.Config.ModelBackend.Host:
+				resp, err := s.modelPublicClient.Liveness(ctx, &modelPB.LivenessRequest{})
+
+				if err != nil {
+					healthcheck = healthcheckPB.HealthCheckResponse{
+						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+					}
+				} else {
+					healthcheck = *resp.GetHealthCheckResponse()
+				}
+			case config.Config.PipelineBackend.Host:
+				resp, err := s.pipelinePublicClient.Liveness(ctx, &pipelinePB.LivenessRequest{})
+
+				if err != nil {
+					healthcheck = healthcheckPB.HealthCheckResponse{
+						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+					}
+				} else {
+					healthcheck = *resp.GetHealthCheckResponse()
+				}
+			case config.Config.MgmtBackend.Host:
+				resp, err := s.mgmtPublicClient.Liveness(ctx, &mgmtPB.LivenessRequest{})
+
+				if err != nil {
+					healthcheck = healthcheckPB.HealthCheckResponse{
+						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+					}
+				} else {
+					healthcheck = *resp.GetHealthCheckResponse()
+				}
+			case config.Config.ConnectorBackend.Host:
+				resp, err := s.connectorPublicClient.Liveness(ctx, &connectorPB.LivenessRequest{})
+
+				if err != nil {
+					healthcheck = healthcheckPB.HealthCheckResponse{
+						Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
+					}
+				} else {
+					healthcheck = *resp.GetHealthCheckResponse()
 				}
 			}
-		case config.Config.ModelBackend.Host:
-			resp, err := s.modelPublicClient.Liveness(ctx, &modelPB.LivenessRequest{})
+
+			err := s.UpdateResourceState(ctx, &controllerPB.Resource{
+				Name: util.ConvertServiceToResourceName(hostname),
+				State: &controllerPB.Resource_BackendState{
+					BackendState: healthcheck.Status,
+				},
+			})
 
 			if err != nil {
-				healthcheck = healthcheckPB.HealthCheckResponse{
-					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
-				}
-			} else {
-				healthcheck = *resp.GetHealthCheckResponse()
+				logger.Error(err.Error())
+				return
 			}
-		case config.Config.PipelineBackend.Host:
-			resp, err := s.pipelinePublicClient.Liveness(ctx, &pipelinePB.LivenessRequest{})
 
-			if err != nil {
-				healthcheck = healthcheckPB.HealthCheckResponse{
-					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
-				}
-			} else {
-				healthcheck = *resp.GetHealthCheckResponse()
-			}
-		case config.Config.MgmtBackend.Host:
-			resp, err := s.mgmtPublicClient.Liveness(ctx, &mgmtPB.LivenessRequest{})
+			resp, _ := s.GetResourceState(ctx, util.ConvertServiceToResourceName(hostname))
 
-			if err != nil {
-				healthcheck = healthcheckPB.HealthCheckResponse{
-					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
-				}
-			} else {
-				healthcheck = *resp.GetHealthCheckResponse()
-			}
-		case config.Config.ConnectorBackend.Host:
-			resp, err := s.connectorPublicClient.Liveness(ctx, &connectorPB.LivenessRequest{})
-
-			if err != nil {
-				healthcheck = healthcheckPB.HealthCheckResponse{
-					Status: healthcheckPB.HealthCheckResponse_SERVING_STATUS_NOT_SERVING,
-				}
-			} else {
-				healthcheck = *resp.GetHealthCheckResponse()
-			}
-		}
-
-		err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-			Name: util.ConvertServiceToResourceName(hostname),
-			State: &controllerPB.Resource_BackendState{
-				BackendState: healthcheck.Status,
-			},
-		})
-
-		if err != nil {
-			return err
-		}
-
-		resp, _ := s.GetResourceState(ctx, util.ConvertServiceToResourceName(hostname))
-
-		logger.Info(fmt.Sprintf("[Controller] Got %v", resp))
+			logger.Info(fmt.Sprintf("[Controller] Got %v", resp))
+		}(hostname)
 	}
+
+	wg.Wait()
 
 	return nil
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
@@ -17,6 +18,8 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 	defer cancel()
 
 	logger, _ := logger.GetZapLogger()
+
+	var wg sync.WaitGroup
 
 	resp, err := s.pipelinePrivateClient.ListPipelinesAdmin(ctx, &pipelinePB.ListPipelinesAdminRequest{
 		View: pipelinePB.View_VIEW_FULL.Enum(),
@@ -45,106 +48,117 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		pipelines = append(pipelines, resp.Pipelines...)
 	}
 
+	wg.Add(len(pipelines))
+
 	for _, pipeline := range pipelines {
-		resourceName := util.ConvertRequestToResourceName(pipeline.Name)
 
-		pipelineResource := controllerPB.Resource{
-			Name: resourceName,
-			State: &controllerPB.Resource_PipelineState{
-				PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
-			},
-		}
+		go func(pipeline *pipelinePB.Pipeline) {
+			defer wg.Done()
 
-		// user desires inactive
-		if pipeline.State == pipelinePB.Pipeline_STATE_INACTIVE {
-			if err := s.UpdateResourceState(ctx, &pipelineResource); err != nil {
-				return err
-			} else {
-				return nil
+			resourceName := util.ConvertRequestToResourceName(pipeline.Name)
+
+			pipelineResource := controllerPB.Resource{
+				Name: resourceName,
+				State: &controllerPB.Resource_PipelineState{
+					PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
+				},
 			}
-		}
 
-		// user desires active, now check each component's state
-		pipelineResource.State = &controllerPB.Resource_PipelineState{PipelineState: pipelinePB.Pipeline_STATE_ERROR}
+			// user desires inactive
+			if pipeline.State == pipelinePB.Pipeline_STATE_INACTIVE {
+				if err := s.UpdateResourceState(ctx, &pipelineResource); err != nil {
+					logger.Error(err.Error())
+					return
+				} else {
+					return
+				}
+			}
 
-		var resources []*controllerPB.Resource
+			// user desires active, now check each component's state
+			pipelineResource.State = &controllerPB.Resource_PipelineState{PipelineState: pipelinePB.Pipeline_STATE_ERROR}
 
-		sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Source))
-		if err != nil {
-			s.UpdateResourceState(ctx, &pipelineResource)
-			logger.Error("no record find for source connector")
-			return err
-		}
-		resources = append(resources, sourceConnectorResource)
+			var resources []*controllerPB.Resource
 
-		destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Destination))
-		if err != nil {
-			s.UpdateResourceState(ctx, &pipelineResource)
-			logger.Error("no record find for destination connector")
-			return err
-		}
-		resources = append(resources, destinationConnectorResource)
-
-		modelNames := pipeline.Recipe.Models
-		for _, modelName := range modelNames {
-			modelResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(modelName))
+			sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Source))
 			if err != nil {
 				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error(fmt.Sprintf("no record find for model  %v", modelName))
-				return err
+				logger.Error("no record found for source connector")
+				return
+			}
+			resources = append(resources, sourceConnectorResource)
+
+			destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Destination))
+			if err != nil {
+				s.UpdateResourceState(ctx, &pipelineResource)
+				logger.Error("no record found for destination connector")
+				return
+			}
+			resources = append(resources, destinationConnectorResource)
+
+			modelNames := pipeline.Recipe.Models
+			for _, modelName := range modelNames {
+				modelResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(modelName))
+				if err != nil {
+					s.UpdateResourceState(ctx, &pipelineResource)
+					logger.Error(fmt.Sprintf("no record found for model  %v", modelName))
+					return
+				}
+
+				resources = append(resources, modelResource)
 			}
 
-			resources = append(resources, modelResource)
-		}
+			for _, r := range resources {
+				switch v := r.State.(type) {
+				case *controllerPB.Resource_ConnectorState:
+					switch v.ConnectorState {
+					case connectorPB.Connector_STATE_DISCONNECTED:
+						pipelineResource.State = &controllerPB.Resource_PipelineState{
+							PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
+						}
+					case connectorPB.Connector_STATE_UNSPECIFIED:
+						pipelineResource.State = &controllerPB.Resource_PipelineState{
+							PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
+						}
+					case connectorPB.Connector_STATE_ERROR:
+						pipelineResource.State = &controllerPB.Resource_PipelineState{
+							PipelineState: pipelinePB.Pipeline_STATE_ERROR,
+						}
+					default:
+						continue
+					}
+				case *controllerPB.Resource_ModelState:
+					switch v.ModelState {
+					case modelPB.Model_STATE_OFFLINE:
+						pipelineResource.State = &controllerPB.Resource_PipelineState{
+							PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
+						}
+					case modelPB.Model_STATE_UNSPECIFIED:
+						pipelineResource.State = &controllerPB.Resource_PipelineState{
+							PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
+						}
+					case modelPB.Model_STATE_ERROR:
+						pipelineResource.State = &controllerPB.Resource_PipelineState{
+							PipelineState: pipelinePB.Pipeline_STATE_ERROR,
+						}
+					default:
+						continue
+					}
+				}
+				s.UpdateResourceState(ctx, &pipelineResource)
+				return
+			}
 
-		for _, r := range resources {
-			switch v := r.State.(type) {
-			case *controllerPB.Resource_ConnectorState:
-				switch v.ConnectorState {
-				case connectorPB.Connector_STATE_DISCONNECTED:
-					pipelineResource.State = &controllerPB.Resource_PipelineState{
-						PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
-					}
-				case connectorPB.Connector_STATE_UNSPECIFIED:
-					pipelineResource.State = &controllerPB.Resource_PipelineState{
-						PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
-					}
-				case connectorPB.Connector_STATE_ERROR:
-					pipelineResource.State = &controllerPB.Resource_PipelineState{
-						PipelineState: pipelinePB.Pipeline_STATE_ERROR,
-					}
-				default:
-					continue
-				}
-			case *controllerPB.Resource_ModelState:
-				switch v.ModelState {
-				case modelPB.Model_STATE_OFFLINE:
-					pipelineResource.State = &controllerPB.Resource_PipelineState{
-						PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
-					}
-				case modelPB.Model_STATE_UNSPECIFIED:
-					pipelineResource.State = &controllerPB.Resource_PipelineState{
-						PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
-					}
-				case modelPB.Model_STATE_ERROR:
-					pipelineResource.State = &controllerPB.Resource_PipelineState{
-						PipelineState: pipelinePB.Pipeline_STATE_ERROR,
-					}
-				default:
-					continue
-				}
+			pipelineResource.State = &controllerPB.Resource_PipelineState{
+				PipelineState: pipelinePB.Pipeline_STATE_ACTIVE,
 			}
 			s.UpdateResourceState(ctx, &pipelineResource)
-			return nil
-		}
 
-		pipelineResource.State = &controllerPB.Resource_PipelineState{
-			PipelineState: pipelinePB.Pipeline_STATE_ACTIVE,
-		}
-		s.UpdateResourceState(ctx, &pipelineResource)
-
-		logResp, _ := s.GetResourceState(ctx, resourceName)
-		logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
+			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
+		}(pipeline)
 	}
+
+	wg.Wait()
+
 	return nil
 }

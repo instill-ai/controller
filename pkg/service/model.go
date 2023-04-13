@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
@@ -15,6 +16,8 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 	defer cancel()
 
 	logger, _ := logger.GetZapLogger()
+
+	var wg sync.WaitGroup
 
 	resp, err := s.modelPublicClient.ListModels(ctx, &modelPB.ListModelsRequest{})
 
@@ -40,28 +43,37 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 		models = append(models, resp.Models...)
 	}
 
+	wg.Add(len(models))
+
 	for _, model := range models {
-		resp, err := s.modelPrivateClient.CheckModel(ctx, &modelPB.CheckModelRequest{
-			Name: model.Name,
-		})
 
-		if err != nil {
-			return err
-		}
+		go func(model *modelPB.Model) {
+			defer wg.Done()
 
-		err = s.UpdateResourceState(ctx, &controllerPB.Resource{
-			Name: util.ConvertRequestToResourceName(model.Name),
-			State: &controllerPB.Resource_ModelState{
-				ModelState: resp.State,
-			},
-		})
+			if resp, err := s.modelPrivateClient.CheckModel(ctx, &modelPB.CheckModelRequest{
+				Name: model.Name,
+			}); err == nil {
+				if err = s.UpdateResourceState(ctx, &controllerPB.Resource{
+					Name: util.ConvertRequestToResourceName(model.Name),
+					State: &controllerPB.Resource_ModelState{
+						ModelState: resp.State,
+					},
+				}); err != nil {
+					logger.Error(err.Error())
+					return
+				}
+			} else {
+				logger.Error(err.Error())
+				return
+			}
 
-		if err != nil {
-			return err
-		}
+			logResp, _ := s.GetResourceState(ctx, util.ConvertRequestToResourceName(model.Name))
+			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
+		}(model)
 
-		logResp, _ := s.GetResourceState(ctx, util.ConvertRequestToResourceName(model.Name))
-		logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 	}
+
+	wg.Wait()
+
 	return nil
 }
