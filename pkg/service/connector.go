@@ -196,7 +196,6 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 }
 
 func (s *service) updateStaleConnector(ctx context.Context, resourceName string, workflowId string) error {
-	logger, _ := logger.GetZapLogger()
 	// non grpc/http connector, save workflowid
 	if workflowId != "" {
 		if err := s.UpdateResourceWorkflowId(ctx, resourceName, workflowId); err != nil {
@@ -212,9 +211,6 @@ func (s *service) updateStaleConnector(ctx context.Context, resourceName string,
 			return err
 		}
 	}
-
-	logResp, _ := s.GetResourceState(ctx, resourceName)
-	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 
 	return nil
 }
