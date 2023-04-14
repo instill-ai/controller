@@ -3,10 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 
-	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
 
@@ -21,7 +19,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 
 	var wg sync.WaitGroup
 
-	resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{})
+	resp, err := s.connectorPrivateClient.ListSourceConnectorsAdmin(ctx, &connectorPB.ListSourceConnectorsAdminRequest{})
 
 	if err != nil {
 		return err
@@ -34,7 +32,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	wg.Add(int(totalSize))
 
 	for totalSize > util.DefaultPageSize {
-		resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{
+		resp, err := s.connectorPrivateClient.ListSourceConnectorsAdmin(ctx, &connectorPB.ListSourceConnectorsAdminRequest{
 			PageToken: nextPageToken,
 		})
 
@@ -65,22 +63,8 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 					logger.Error(err.Error())
 					return
 				}
-			}
-			// if user desires connected
-			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
-			// check if there is an ongoing workflow
-			if workflowId != nil {
-				opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_SOURCE_CONNECTOR)
-				if err != nil {
-					logger.Error(err.Error())
-					return
-				}
-				if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
-					logger.Error(err.Error())
-					return
-				}
-				// if not trigger connector check workflow
 			} else {
+				// if user desires connected
 				resp, err := s.connectorPrivateClient.CheckSourceConnector(ctx, &connectorPB.CheckSourceConnectorRequest{
 					Name: connector.Name,
 				})
@@ -88,12 +72,18 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 					logger.Error(err.Error())
 					return
 				}
-				// non grpc/http connector, save workflowid
-				if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
+				if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
+					Name: resourceName,
+					State: &controllerPB.Resource_ConnectorState{
+						ConnectorState: resp.State,
+					},
+				}); err != nil {
 					logger.Error(err.Error())
 					return
 				}
 			}
+			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(connector)
 	}
 
@@ -109,7 +99,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 
 	var wg sync.WaitGroup
 
-	resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{})
+	resp, err := s.connectorPrivateClient.ListDestinationConnectorsAdmin(ctx, &connectorPB.ListDestinationConnectorsAdminRequest{})
 
 	if err != nil {
 		return err
@@ -120,7 +110,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	totalSize := resp.TotalSize
 
 	for totalSize > util.DefaultPageSize {
-		resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{
+		resp, err := s.connectorPrivateClient.ListDestinationConnectorsAdmin(ctx, &connectorPB.ListDestinationConnectorsAdminRequest{
 			PageToken: nextPageToken,
 		})
 
@@ -153,22 +143,8 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 					logger.Error(err.Error())
 					return
 				}
-			}
-			// if user desires connected
-			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
-			// check if there is an ongoing workflow
-			if workflowId != nil {
-				opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_DESTINATION_CONNECTOR)
-				if err != nil {
-					logger.Error(err.Error())
-					return
-				}
-				if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
-					logger.Error(err.Error())
-					return
-				}
-				// if not trigger connector check workflow
 			} else {
+				// if user desires connected
 				resp, err := s.connectorPrivateClient.CheckDestinationConnector(ctx, &connectorPB.CheckDestinationConnectorRequest{
 					Name: connector.Name,
 				})
@@ -176,67 +152,22 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 					logger.Error(err.Error())
 					return
 				}
-				if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
+				if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
+					Name: resourceName,
+					State: &controllerPB.Resource_ConnectorState{
+						ConnectorState: resp.State,
+					},
+				}); err != nil {
 					logger.Error(err.Error())
 					return
 				}
 			}
+			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(connector)
 	}
 
 	wg.Wait()
-
-	return nil
-}
-
-func (s *service) updateRunningConnector(ctx context.Context, resourceName string, opInfo longrunningpb.Operation) error {
-	logger, _ := logger.GetZapLogger()
-
-	// if workflow done get result, otherwise remains same state
-	if opInfo.Done {
-		stateInt, err := strconv.ParseInt(string(opInfo.GetResponse().Value[:]), 10, 32)
-		if err != nil {
-			return err
-		}
-		if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-			Name: resourceName,
-			State: &controllerPB.Resource_ConnectorState{
-				ConnectorState: connectorPB.Connector_State(stateInt),
-			},
-		}); err != nil {
-			return err
-		}
-		if err := s.DeleteResourceWorkflowId(ctx, resourceName); err != nil {
-			return err
-		}
-	}
-
-	logResp, _ := s.GetResourceState(ctx, resourceName)
-	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
-
-	return nil
-}
-
-func (s *service) updateStaleConnector(ctx context.Context, resourceName string, workflowId string) error {
-	logger, _ := logger.GetZapLogger()
-	// non grpc/http connector, save workflowid
-	if workflowId != "" {
-		if err := s.UpdateResourceWorkflowId(ctx, resourceName, workflowId); err != nil {
-			return err
-		}
-	} else {
-		if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-			Name: resourceName,
-			State: &controllerPB.Resource_ConnectorState{
-				ConnectorState: connectorPB.Connector_STATE_CONNECTED,
-			},
-		}); err != nil {
-			return err
-		}
-	}
-
-	logResp, _ := s.GetResourceState(ctx, resourceName)
-	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 
 	return nil
 }

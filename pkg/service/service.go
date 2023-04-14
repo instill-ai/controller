@@ -367,14 +367,8 @@ func (s *service) getOperationInfo(workflowId string, resourceType string) (*lon
 			return nil, err
 		}
 		operation = op.Operation
-	case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
-		op, err := s.connectorPublicClient.GetConnectorOperation(ctx, &connectorPB.GetConnectorOperationRequest{
-			Name: fmt.Sprintf("operations/%s", workflowId),
-		})
-		if err != nil {
-			return nil, err
-		}
-		operation = op.Operation
+	default:
+		return nil, fmt.Errorf("resource type %s workflow not implemented", resourceType)
 	}
 
 	return operation, nil
