@@ -3,10 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 
-	"cloud.google.com/go/longrunning/autogen/longrunningpb"
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
 
@@ -75,9 +73,11 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 					logger.Error(err.Error())
 					return
 				}
-				if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
-					logger.Error(err.Error())
-					return
+				if opInfo.Done {
+					if err := s.DeleteResourceWorkflowId(ctx, resourceName); err != nil {
+						logger.Error(err.Error())
+						return
+					}
 				}
 				// if not trigger connector check workflow
 			} else {
@@ -94,6 +94,8 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 					return
 				}
 			}
+			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(connector)
 	}
 
@@ -163,9 +165,11 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 					logger.Error(err.Error())
 					return
 				}
-				if err := s.updateRunningConnector(ctx, resourceName, *opInfo); err != nil {
-					logger.Error(err.Error())
-					return
+				if opInfo.Done {
+					if err := s.DeleteResourceWorkflowId(ctx, resourceName); err != nil {
+						logger.Error(err.Error())
+						return
+					}
 				}
 				// if not trigger connector check workflow
 			} else {
@@ -181,6 +185,8 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 					return
 				}
 			}
+			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(connector)
 	}
 
@@ -189,36 +195,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	return nil
 }
 
-func (s *service) updateRunningConnector(ctx context.Context, resourceName string, opInfo longrunningpb.Operation) error {
-	logger, _ := logger.GetZapLogger()
-
-	// if workflow done get result, otherwise remains same state
-	if opInfo.Done {
-		stateInt, err := strconv.ParseInt(string(opInfo.GetResponse().Value[:]), 10, 32)
-		if err != nil {
-			return err
-		}
-		if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-			Name: resourceName,
-			State: &controllerPB.Resource_ConnectorState{
-				ConnectorState: connectorPB.Connector_State(stateInt),
-			},
-		}); err != nil {
-			return err
-		}
-		if err := s.DeleteResourceWorkflowId(ctx, resourceName); err != nil {
-			return err
-		}
-	}
-
-	logResp, _ := s.GetResourceState(ctx, resourceName)
-	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
-
-	return nil
-}
-
 func (s *service) updateStaleConnector(ctx context.Context, resourceName string, workflowId string) error {
-	logger, _ := logger.GetZapLogger()
 	// non grpc/http connector, save workflowid
 	if workflowId != "" {
 		if err := s.UpdateResourceWorkflowId(ctx, resourceName, workflowId); err != nil {
@@ -234,9 +211,6 @@ func (s *service) updateStaleConnector(ctx context.Context, resourceName string,
 			return err
 		}
 	}
-
-	logResp, _ := s.GetResourceState(ctx, resourceName)
-	logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 
 	return nil
 }

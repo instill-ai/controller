@@ -137,6 +137,23 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 	switch resourceType {
 	case util.RESOURCE_TYPE_MODEL:
 		state = int(resource.GetModelState())
+		if workflowId != nil {
+			if len(*workflowId) > 1 {
+				if opInfo, err := s.getOperationInfo(*workflowId, resourceType); err != nil {
+					return err
+				} else {
+					if opInfo != nil {
+						if !opInfo.Done {
+							state = int(modelPB.Model_STATE_UNSPECIFIED)
+						} else {
+							if err := s.DeleteResourceWorkflowId(ctx, resource.Name); err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
+		}
 	case util.RESOURCE_TYPE_PIPELINE:
 		state = int(resource.GetPipelineState())
 	case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
@@ -145,39 +162,6 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 		state = int(resource.GetBackendState())
 	default:
 		return fmt.Errorf(fmt.Sprintf("update resource type %s not implemented", resourceType))
-	}
-
-	// only for models
-	if workflowId != nil {
-		if len(*workflowId) > 1 {
-			opInfo, err := s.getOperationInfo(*workflowId, resourceType)
-
-			if err != nil {
-				return err
-			}
-
-			if opInfo != nil {
-
-				if !opInfo.Done {
-					switch resourceType {
-					case util.RESOURCE_TYPE_MODEL:
-						state = int(modelPB.Model_STATE_UNSPECIFIED)
-					case util.RESOURCE_TYPE_PIPELINE:
-						state = int(pipelinePB.Pipeline_STATE_UNSPECIFIED)
-					case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
-						state = int(connectorPB.Connector_STATE_UNSPECIFIED)
-					case util.RESOURCE_TYPE_SERVICE:
-						state = int(healthcheckPB.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED)
-					default:
-						return fmt.Errorf(fmt.Sprintf("resource type %s not implemented", resourceType))
-					}
-				} else {
-					if err := s.DeleteResourceWorkflowId(ctx, resource.Name); err != nil {
-						return err
-					}
-				}
-			}
-		}
 	}
 
 	_, err := s.etcdClient.Put(ctx, resource.Name, fmt.Sprint(state))
