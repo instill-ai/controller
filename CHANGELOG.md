@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1-alpha](https://github.com/instill-ai/controller/compare/v0.1.0-alpha...v0.1.1-alpha) (2023-04-15)
+
+
+### Bug Fixes
+
+* probe requests block thread ([#13](https://github.com/instill-ai/controller/issues/13)) ([0294b2a](https://github.com/instill-ai/controller/commit/0294b2ad69e43e76921e2760df4e8dd590a1695b))
+
 ## [0.1.0-alpha](https://github.com/instill-ai/controller/compare/v0.0.0-alpha...v0.1.0-alpha) (2023-04-08)
 
 
