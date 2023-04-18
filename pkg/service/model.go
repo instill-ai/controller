@@ -19,7 +19,7 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 
 	var wg sync.WaitGroup
 
-	resp, err := s.modelPublicClient.ListModels(ctx, &modelPB.ListModelsRequest{})
+	resp, err := s.modelPrivateClient.ListModelsAdmin(ctx, &modelPB.ListModelsAdminRequest{})
 
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 	totalSize := resp.TotalSize
 
 	for totalSize > util.DefaultPageSize {
-		resp, err := s.modelPublicClient.ListModels(ctx, &modelPB.ListModelsRequest{
+		resp, err := s.modelPrivateClient.ListModelsAdmin(ctx, &modelPB.ListModelsAdminRequest{
 			PageToken: nextPageToken,
 		})
 
