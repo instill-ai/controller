@@ -19,7 +19,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 
 	var wg sync.WaitGroup
 
-	resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{})
+	resp, err := s.connectorPrivateClient.ListSourceConnectorsAdmin(ctx, &connectorPB.ListSourceConnectorsAdminRequest{})
 
 	if err != nil {
 		return err
@@ -32,7 +32,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	wg.Add(int(totalSize))
 
 	for totalSize > util.DefaultPageSize {
-		resp, err := s.connectorPublicClient.ListSourceConnectors(ctx, &connectorPB.ListSourceConnectorsRequest{
+		resp, err := s.connectorPrivateClient.ListSourceConnectorsAdmin(ctx, &connectorPB.ListSourceConnectorsAdminRequest{
 			PageToken: nextPageToken,
 		})
 
@@ -111,7 +111,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 
 	var wg sync.WaitGroup
 
-	resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{})
+	resp, err := s.connectorPrivateClient.ListDestinationConnectorsAdmin(ctx, &connectorPB.ListDestinationConnectorsAdminRequest{})
 
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	totalSize := resp.TotalSize
 
 	for totalSize > util.DefaultPageSize {
-		resp, err := s.connectorPublicClient.ListDestinationConnectors(ctx, &connectorPB.ListDestinationConnectorsRequest{
+		resp, err := s.connectorPrivateClient.ListDestinationConnectorsAdmin(ctx, &connectorPB.ListDestinationConnectorsAdminRequest{
 			PageToken: nextPageToken,
 		})
 
