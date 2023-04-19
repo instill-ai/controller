@@ -2,7 +2,6 @@ package service_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -213,12 +212,6 @@ func TestUpdateResourceState(t *testing.T) {
 
 		mockKV.
 			EXPECT().
-			Get(ctx, fmt.Sprintf("%s/workflow", serviceResourceName)).
-			Return(&etcdv3.GetResponse{}, nil).
-			Times(1)
-
-		mockKV.
-			EXPECT().
 			Put(ctx, serviceResourceName, string("0")).
 			Return(&etcdv3.PutResponse{}, nil).
 			Times(1)
@@ -255,12 +248,6 @@ func TestUpdateResourceState(t *testing.T) {
 				ModelState: modelPB.Model_STATE_UNSPECIFIED,
 			},
 		}
-
-		mockKV.
-			EXPECT().
-			Get(ctx, fmt.Sprintf("%s/workflow", modelResourceName)).
-			Return(&etcdv3.GetResponse{}, nil).
-			Times(1)
 
 		mockKV.
 			EXPECT().
@@ -303,12 +290,6 @@ func TestUpdateResourceState(t *testing.T) {
 
 		mockKV.
 			EXPECT().
-			Get(ctx, fmt.Sprintf("%s/workflow", connectorResourceName)).
-			Return(&etcdv3.GetResponse{}, nil).
-			Times(1)
-
-		mockKV.
-			EXPECT().
 			Put(ctx, connectorResourceName, string("0")).
 			Return(&etcdv3.PutResponse{}, nil).
 			Times(1)
@@ -345,12 +326,6 @@ func TestUpdateResourceState(t *testing.T) {
 				PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
 			},
 		}
-
-		mockKV.
-			EXPECT().
-			Get(ctx, fmt.Sprintf("%s/workflow", pipelineResourceName)).
-			Return(&etcdv3.GetResponse{}, nil).
-			Times(1)
 
 		mockKV.
 			EXPECT().
