@@ -128,8 +128,6 @@ func (s *service) GetResourceState(ctx context.Context, resourceName string) (*c
 }
 
 func (s *service) UpdateResourceState(ctx context.Context, resource *controllerPB.Resource) error {
-	workflowId, _ := s.GetResourceWorkflowId(ctx, resource.Name)
-
 	resourceType := strings.SplitN(resource.Name, "/", 4)[3]
 
 	state := 0
@@ -137,23 +135,6 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 	switch resourceType {
 	case util.RESOURCE_TYPE_MODEL:
 		state = int(resource.GetModelState())
-		if workflowId != nil {
-			if len(*workflowId) > 1 {
-				if opInfo, err := s.getOperationInfo(*workflowId, resourceType); err != nil {
-					return err
-				} else {
-					if opInfo != nil {
-						if !opInfo.Done {
-							state = int(modelPB.Model_STATE_UNSPECIFIED)
-						} else {
-							if err := s.DeleteResourceWorkflowId(ctx, resource.Name); err != nil {
-								return err
-							}
-						}
-					}
-				}
-			}
-		}
 	case util.RESOURCE_TYPE_PIPELINE:
 		state = int(resource.GetPipelineState())
 	case util.RESOURCE_TYPE_SOURCE_CONNECTOR, util.RESOURCE_TYPE_DESTINATION_CONNECTOR:

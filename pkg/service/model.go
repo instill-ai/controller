@@ -50,24 +50,42 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 		go func(model *modelPB.Model) {
 			defer wg.Done()
 
-			if resp, err := s.modelPrivateClient.CheckModel(ctx, &modelPB.CheckModelRequest{
-				Name: model.Name,
-			}); err == nil {
-				if err = s.UpdateResourceState(ctx, &controllerPB.Resource{
-					Name: util.ConvertRequestToResourceName(model.Name),
-					State: &controllerPB.Resource_ModelState{
-						ModelState: resp.State,
-					},
-				}); err != nil {
+			resourceName := util.ConvertRequestToResourceName(model.Name)
+
+			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
+
+			if workflowId != nil {
+				opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_MODEL)
+				if err != nil {
 					logger.Error(err.Error())
 					return
 				}
+				if opInfo.Done {
+					if err := s.DeleteResourceWorkflowId(ctx, resourceName); err != nil {
+						logger.Error(err.Error())
+						return
+					}
+				}
 			} else {
-				logger.Error(err.Error())
-				return
+				if resp, err := s.modelPrivateClient.CheckModel(ctx, &modelPB.CheckModelRequest{
+					Name: model.Name,
+				}); err == nil {
+					if err = s.UpdateResourceState(ctx, &controllerPB.Resource{
+						Name: resourceName,
+						State: &controllerPB.Resource_ModelState{
+							ModelState: resp.State,
+						},
+					}); err != nil {
+						logger.Error(err.Error())
+						return
+					}
+				} else {
+					logger.Error(err.Error())
+					return
+				}
 			}
 
-			logResp, _ := s.GetResourceState(ctx, util.ConvertRequestToResourceName(model.Name))
+			logResp, _ := s.GetResourceState(ctx, resourceName)
 			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(model)
 
