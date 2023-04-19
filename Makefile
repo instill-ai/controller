@@ -16,6 +16,7 @@ dev:							## Run dev container
 		echo "Run dev container ${SERVICE_NAME}. To stop it, run \"make stop\"."
 	@docker run -d --rm \
 		-e DOCKER_HOST=${SOCAT_HOST}:${SOCAT_PORT} \
+		-e CFG_ETCD_PORT=${ETCD_CLIENT_PORT} \
 		-v $(PWD):/${SERVICE_NAME} \
 		-p ${SERVICE_PORT}:${SERVICE_PORT} \
 		--network instill-network \
