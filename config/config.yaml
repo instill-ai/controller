@@ -12,25 +12,6 @@ etcd:
   host: etcd
   port: 2379
   timeout: 10
-database:
-  username: postgres
-  password: password
-  host: pg-sql
-  port: 5432
-  name: pipeline
-  version: 1
-  timezone: Etc/UTC
-  pool:
-    idleconnections: 5
-    maxconnections: 10
-    connlifetime: 30m # In minutes, e.g., '60m'
-cache:
-  redis:
-    redisoptions:
-      addr: redis:6379
-temporal:
-  clientoptions:
-    hostport: temporal:7233
 tritonserver:
   host: triton-server
   grpcuri: triton-server:8001

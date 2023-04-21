@@ -3,10 +3,10 @@ package handler
 import (
 	"context"
 
-	"github.com/instill-ai/controller/pkg/service"
-
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
 	healthcheckPB "github.com/instill-ai/protogen-go/vdp/healthcheck/v1alpha"
+
+	"github.com/instill-ai/controller/pkg/service"
 )
 
 type PrivateHandler struct {
