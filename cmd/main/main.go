@@ -33,7 +33,6 @@ import (
 	"github.com/instill-ai/controller/pkg/handler"
 	"github.com/instill-ai/controller/pkg/service"
 
-	database "github.com/instill-ai/controller/internal/db"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
 )
 
@@ -67,10 +66,6 @@ func main() {
 		_ = logger.Sync()
 	}()
 	grpc_zap.ReplaceGrpcLoggerV2(logger)
-
-	// TODO: remove if unnecessary
-	db := database.GetConnection()
-	defer database.Close(db)
 
 	// Create tls based credential.
 	var creds credentials.TransportCredentials
