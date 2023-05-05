@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.3-alpha](https://github.com/instill-ai/controller/compare/v0.1.2-alpha...v0.1.3-alpha) (2023-05-05)
+
+
+### Bug Fixes
+
+* **model,connector,pipeline:** update resource name to uuid ([#25](https://github.com/instill-ai/controller/issues/25)) ([97dd55d](https://github.com/instill-ai/controller/commit/97dd55dc272dc3f7feeb90e80db6e0a5f080c010))
+
+
+### Miscellaneous Chores
+
+* **release:** release v0.1.3-alpha ([47b1bbc](https://github.com/instill-ai/controller/commit/47b1bbc0dc12a69f6220623aa7bf0c6306bc4992))
+
 ## [0.1.2-alpha](https://github.com/instill-ai/controller/compare/v0.1.1-alpha...v0.1.2-alpha) (2023-04-24)
 
 
