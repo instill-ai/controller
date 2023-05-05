@@ -114,7 +114,7 @@ jobs:
 
       - name: Run integration-test
         run: |
-          make integration-test MODE=localhost
+          make integration-test API_GATEWAY_HOST=localhost API_GATEWAY_PORT=8080
 
       - name: Checkout (pipeline)
         uses: actions/checkout@v3
@@ -128,7 +128,7 @@ jobs:
 
       - name: Run integration-test
         run: |
-          make integration-test MODE=localhost
+          make integration-test API_GATEWAY_HOST=localhost API_GATEWAY_PORT=8080
 
       - name: Checkout (model)
         uses: actions/checkout@v3
@@ -142,7 +142,7 @@ jobs:
 
       - name: Run integration-test
         run: |
-          make integration-test MODE=localhost
+          make integration-test API_GATEWAY_HOST=localhost API_GATEWAY_PORT=8080
 
       - name: Checkout (mgmt)
         uses: actions/checkout@v3
@@ -156,7 +156,7 @@ jobs:
 
       - name: Run integration-test
         run: |
-          make integration-test MODE=localhost
+          make integration-test API_GATEWAY_HOST=localhost API_GATEWAY_PORT=8080
 
       - name: Checkout (connector)
         uses: actions/checkout@v3
@@ -170,4 +170,4 @@ jobs:
 
       - name: Run integration-test
         run: |
-          make integration-test MODE=localhost
+          make integration-test API_GATEWAY_HOST=localhost API_GATEWAY_PORT=8080

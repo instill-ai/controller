@@ -22,7 +22,7 @@ export default function (data) {
   /*
    * Controller API - API CALLS
    */
-  if (__ENV.MODE != "api-gateway") {
+  if (!constant.apiGatewayMode) {
     // Health check
     group("Controller API: Health check", () => {
       client.connect(constant.controllerGRPCPrivateHost, {
@@ -50,7 +50,7 @@ export default function (data) {
 }
 
 export function teardown(data) {
-  if (__ENV.MODE != "api-gateway") {
+  if (!constant.apiGatewayMode) {
     client.connect(constant.controllerGRPCPrivateHost, {
       plaintext: true
     });
