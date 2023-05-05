@@ -30,12 +30,12 @@ type Service interface {
 	GetResourceWorkflowId(ctx context.Context, resourceName string) (*string, error)
 	UpdateResourceWorkflowId(ctx context.Context, resourceName string, workflowId string) error
 	DeleteResourceWorkflowId(ctx context.Context, resourceName string) error
-	getOperationInfo(workflowId string, resourceType string) (*longrunningpb.Operation, error)
 	ProbeBackend(ctx context.Context, cancel context.CancelFunc) error
 	ProbeModels(ctx context.Context, cancel context.CancelFunc) error
 	ProbeSourceConnectors(ctx context.Context, cancel context.CancelFunc) error
 	ProbeDestinationConnectors(ctx context.Context, cancel context.CancelFunc) error
 	ProbePipelines(ctx context.Context, cancel context.CancelFunc) error
+	GetResourceParams(ctx context.Context, requestName string) (string, string, string, error)
 }
 
 type service struct {
@@ -83,7 +83,7 @@ func (s *service) GetResourceState(ctx context.Context, resourceName string) (*c
 	kvs := resp.Kvs
 
 	if len(kvs) == 0 {
-		return nil, fmt.Errorf(fmt.Sprintf("resource %v not found in etcd storage ", resourceName))
+		return nil, fmt.Errorf(fmt.Sprintf("resource %v not found in etcd storage", resourceName))
 	}
 
 	resourceType := strings.SplitN(resourceName, "/", 4)[3]
@@ -145,9 +145,7 @@ func (s *service) UpdateResourceState(ctx context.Context, resource *controllerP
 		return fmt.Errorf(fmt.Sprintf("update resource type %s not implemented", resourceType))
 	}
 
-	_, err := s.etcdClient.Put(ctx, resource.Name, fmt.Sprint(state))
-
-	if err != nil {
+	if _, err := s.etcdClient.Put(ctx, resource.Name, fmt.Sprint(state)); err != nil {
 		return err
 	}
 
@@ -315,6 +313,59 @@ func (s *service) ProbeBackend(ctx context.Context, cancel context.CancelFunc) e
 	wg.Wait()
 
 	return nil
+}
+
+// return resourceUid, resourceName, resourceType, err
+func (s *service) GetResourceParams(ctx context.Context, requestName string) (string, string, string, error) {
+	splitResourceString := strings.SplitN(requestName, "/", 4)
+	if len(splitResourceString) != 4 {
+		return "", "", "", fmt.Errorf("invalid resource name format")
+	}
+	resourceType := splitResourceString[3]
+	resourceName := resourceType + "/" + splitResourceString[1]
+
+	var resourceUid string
+
+	switch resourceType {
+	case util.RESOURCE_TYPE_MODEL:
+		if resp, err := s.modelPrivateClient.GetModelAdmin(ctx, &modelPB.GetModelAdminRequest{
+			Name: resourceName,
+		}); err != nil {
+			return "", resourceName, resourceType, fmt.Errorf("uuid not registered")
+		} else{
+			resourceUid = resp.Model.Uid
+		}
+	case util.RESOURCE_TYPE_PIPELINE:
+		if resp, err := s.pipelinePrivateClient.GetPipelineAdmin(ctx, &pipelinePB.GetPipelineAdminRequest{
+			Name: resourceName,
+		}); err != nil {
+			return "", resourceName, resourceType, fmt.Errorf("uuid not registered")
+		} else{
+			resourceUid = resp.Pipeline.Uid
+		}
+	case util.RESOURCE_TYPE_SOURCE_CONNECTOR:
+		if resp, err := s.connectorPrivateClient.GetSourceConnectorAdmin(ctx, &connectorPB.GetSourceConnectorAdminRequest{
+			Name: resourceName,
+		}); err != nil {
+			return "", resourceName, resourceType, fmt.Errorf("uuid not registered")
+		} else{
+			resourceUid = resp.SourceConnector.Uid
+		}
+	case util.RESOURCE_TYPE_DESTINATION_CONNECTOR:
+		if resp, err := s.connectorPrivateClient.GetDestinationConnectorAdmin(ctx, &connectorPB.GetDestinationConnectorAdminRequest{
+			Name: resourceName,
+		}); err != nil {
+			return "", resourceName, resourceType, fmt.Errorf("uuid not registered")
+		} else{
+			resourceUid = resp.DestinationConnector.Uid
+		}
+	case util.RESOURCE_TYPE_SERVICE:
+		resourceUid = splitResourceString[1]
+	default:
+		return "", "", "", fmt.Errorf(fmt.Sprintf("resource type %s not implemented", resourceType))
+	}
+
+	return resourceUid, resourceName, resourceType, nil
 }
 
 func (s *service) getOperationInfo(workflowId string, resourceType string) (*longrunningpb.Operation, error) {

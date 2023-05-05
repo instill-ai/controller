@@ -50,7 +50,7 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 		go func(model *modelPB.Model) {
 			defer wg.Done()
 
-			resourceName := util.ConvertRequestToResourceName(model.Name)
+			resourceName := util.ConvertRequestToResourceName(model.Name, model.Uid)
 
 			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
 

@@ -5,10 +5,9 @@ import (
 	"strings"
 )
 
-func ConvertRequestToResourceName(requestName string) string {
-	splitName := strings.SplitN(requestName, "/", 2)
-	resourceType, name := splitName[0], splitName[1]
-	resourceName := fmt.Sprintf("resources/%s/types/%s", name, resourceType)
+func ConvertRequestToResourceName(requestName string, uid string) string {
+	resourceType := strings.SplitN(requestName, "/", 2)[0]
+	resourceName := fmt.Sprintf("resources/%s/types/%s", uid, resourceType)
 
 	return resourceName
 }

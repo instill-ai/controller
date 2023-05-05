@@ -55,7 +55,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		go func(pipeline *pipelinePB.Pipeline) {
 			defer wg.Done()
 
-			resourceName := util.ConvertRequestToResourceName(pipeline.Name)
+			resourceName := util.ConvertRequestToResourceName(pipeline.Name, pipeline.Uid)
 
 			pipelineResource := controllerPB.Resource{
 				Name: resourceName,
@@ -78,26 +78,52 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 			pipelineResource.State = &controllerPB.Resource_PipelineState{PipelineState: pipelinePB.Pipeline_STATE_ERROR}
 
 			var resources []*controllerPB.Resource
-
-			sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Source))
+			// source connector
+			getSourceConnectorResp, err := s.connectorPrivateClient.GetSourceConnectorAdmin(ctx, &connectorPB.GetSourceConnectorAdminRequest{
+				Name: pipeline.Recipe.Source,
+			})
 			if err != nil {
 				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error("no record found for source connector")
+				logger.Error("no record found for source connector in postgresql")
+				return
+			}
+			sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Source, getSourceConnectorResp.SourceConnector.Uid))
+			if err != nil {
+				s.UpdateResourceState(ctx, &pipelineResource)
+				logger.Error("no record found for source connector in etcd")
 				return
 			}
 			resources = append(resources, sourceConnectorResource)
 
-			destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Destination))
+			// destination connector
+			getDestinationConnectorResp, err := s.connectorPrivateClient.GetDestinationConnectorAdmin(ctx, &connectorPB.GetDestinationConnectorAdminRequest{
+				Name: pipeline.Recipe.Destination,
+			})
 			if err != nil {
 				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error("no record found for destination connector")
+				logger.Error("no record found for destination connector in postgresql")
+				return
+			}
+			destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Destination, getDestinationConnectorResp.DestinationConnector.Uid))
+			if err != nil {
+				s.UpdateResourceState(ctx, &pipelineResource)
+				logger.Error("no record found for destination connector in etcd")
 				return
 			}
 			resources = append(resources, destinationConnectorResource)
 
+			// models
 			modelNames := pipeline.Recipe.Models
 			for _, modelName := range modelNames {
-				modelResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(modelName))
+				getModelResp, err := s.modelPrivateClient.GetModelAdmin(ctx, &modelPB.GetModelAdminRequest{
+					Name: modelName,
+				})
+				if err != nil {
+					s.UpdateResourceState(ctx, &pipelineResource)
+					logger.Error("no record found for model in postgresql")
+					return
+				}
+				modelResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(modelName, getModelResp.Model.Uid))
 				if err != nil {
 					s.UpdateResourceState(ctx, &pipelineResource)
 					logger.Error(fmt.Sprintf("no record found for model  %v", modelName))

@@ -2,10 +2,13 @@ package handler
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
 	healthcheckPB "github.com/instill-ai/protogen-go/vdp/healthcheck/v1alpha"
 
+	"github.com/instill-ai/controller/internal/util"
 	"github.com/instill-ai/controller/pkg/service"
 )
 
@@ -40,10 +43,36 @@ func (h *PrivateHandler) Readiness(ctx context.Context, in *controllerPB.Readine
 }
 
 func (h *PrivateHandler) GetResource(ctx context.Context, req *controllerPB.GetResourceRequest) (*controllerPB.GetResourceResponse, error) {
-	resource, err := h.service.GetResourceState(ctx, req.Name)
-
+	resourceUid, resourceName, _, err := h.service.GetResourceParams(ctx, req.Name)
+	// TODO: do not register resource in etcd before creation is done
+	// Temp solution, resource does not have uuid yet, use id as intermediate state
 	if err != nil {
-		return nil, err
+		if err.Error() == "uuid not registered" {
+			if resource, err := h.service.GetResourceState(ctx, req.Name); err != nil {
+				return nil, err
+			} else {
+				return &controllerPB.GetResourceResponse{
+					Resource: resource,
+				}, nil
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	resource, err := h.service.GetResourceState(ctx, util.ConvertRequestToResourceName(resourceName, resourceUid))
+
+	// TODO: do not register resource in etcd before creation is done
+	// Temp solution, resource does not have uuid yet, use id as intermediate state
+	if err != nil {
+		if err.Error() == fmt.Sprintf("resource %v not found in etcd storage", util.ConvertRequestToResourceName(resourceName, resourceUid)){
+			if resource, err = h.service.GetResourceState(ctx, util.ConvertRequestToResourceName(resourceName, strings.Split(resourceName, "/")[1])); err != nil {
+				return nil, err
+			}
+			h.service.DeleteResourceState(ctx, util.ConvertRequestToResourceName(resourceName, strings.Split(resourceName, "/")[1]))
+		} else {
+			return nil, err
+		}
 	}
 
 	return &controllerPB.GetResourceResponse{
@@ -52,6 +81,24 @@ func (h *PrivateHandler) GetResource(ctx context.Context, req *controllerPB.GetR
 }
 
 func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.UpdateResourceRequest) (*controllerPB.UpdateResourceResponse, error) {
+	resourceUid, resourceName, _, err := h.service.GetResourceParams(ctx, req.Resource.Name)
+	// TODO: do not register resource in etcd before creation is done
+	// Temp solution, resource does not have uuid yet, use id as intermediate state
+	if err != nil {
+		if err.Error() == "uuid not registered" {
+			if err := h.service.UpdateResourceState(ctx, req.Resource); err != nil {
+				return nil, err
+			}
+			return &controllerPB.UpdateResourceResponse{
+				Resource: req.Resource,
+			}, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	req.Resource.Name = util.ConvertRequestToResourceName(resourceName, resourceUid)
+
 	if req.WorkflowId != nil {
 		err := h.service.UpdateResourceWorkflowId(ctx, req.Resource.Name, *req.WorkflowId)
 
@@ -59,9 +106,8 @@ func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.U
 			return nil, err
 		}
 	}
-	err := h.service.UpdateResourceState(ctx, req.Resource)
 
-	if err != nil {
+	if err := h.service.UpdateResourceState(ctx, req.Resource); err != nil {
 		return nil, err
 	}
 
@@ -71,15 +117,20 @@ func (h *PrivateHandler) UpdateResource(ctx context.Context, req *controllerPB.U
 }
 
 func (h *PrivateHandler) DeleteResource(ctx context.Context, req *controllerPB.DeleteResourceRequest) (*controllerPB.DeleteResourceResponse, error) {
-	err := h.service.DeleteResourceState(ctx, req.Name)
-
+	resourceUid, resourceName, _, err := h.service.GetResourceParams(ctx, req.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.service.DeleteResourceWorkflowId(ctx, req.Name)
+	if err = h.service.DeleteResourceState(ctx, util.ConvertRequestToResourceName(resourceName, resourceUid)); err != nil {
+		return nil, err
+	}
 
-	if err != nil {
+	if err = h.service.DeleteResourceState(ctx, req.Name); err != nil {
+		return nil, err
+	}
+
+	if err = h.service.DeleteResourceWorkflowId(ctx, req.Name); err != nil {
 		return nil, err
 	}
 
