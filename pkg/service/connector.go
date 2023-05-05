@@ -50,7 +50,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 		go func(connector *connectorPB.SourceConnector) {
 			defer wg.Done()
 
-			resourceName := util.ConvertRequestToResourceName(connector.Name)
+			resourceName := util.ConvertRequestToResourceName(connector.Name, connector.Uid)
 
 			// if user desires disconnected
 			if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
@@ -142,7 +142,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 		go func(connector *connectorPB.DestinationConnector) {
 			defer wg.Done()
 
-			resourceName := util.ConvertRequestToResourceName(connector.Name)
+			resourceName := util.ConvertRequestToResourceName(connector.Name, connector.Uid)
 
 			// if user desires disconnected
 			if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
