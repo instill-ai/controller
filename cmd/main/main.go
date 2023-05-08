@@ -183,24 +183,6 @@ func main() {
 		Handler: grpcHandlerFunc(grpcS, serverMux, config.Config.Server.CORSOrigins),
 	}
 
-	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 5 seconds.
-	quitSig := make(chan os.Signal, 1)
-	errSig := make(chan error)
-	if config.Config.Server.HTTPS.Cert != "" && config.Config.Server.HTTPS.Key != "" {
-		go func() {
-			if err := httpServer.ListenAndServeTLS(config.Config.Server.HTTPS.Cert, config.Config.Server.HTTPS.Key); err != nil {
-				errSig <- err
-			}
-		}()
-	} else {
-		go func() {
-			if err := httpServer.ListenAndServe(); err != nil {
-				errSig <- err
-			}
-		}()
-	}
-	logger.Info("gRPC server is running.")
-
 	go func() {
 		logger.Info("[controller] control loop started")
 		var mainWG sync.WaitGroup
@@ -251,6 +233,26 @@ func main() {
 			mainWG.Wait()
 		}
 	}()
+
+	time.Sleep(2 * config.Config.Server.LoopInterval * time.Second)
+
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 5 seconds.
+	quitSig := make(chan os.Signal, 1)
+	errSig := make(chan error)
+	if config.Config.Server.HTTPS.Cert != "" && config.Config.Server.HTTPS.Key != "" {
+		go func() {
+			if err := httpServer.ListenAndServeTLS(config.Config.Server.HTTPS.Cert, config.Config.Server.HTTPS.Key); err != nil {
+				errSig <- err
+			}
+		}()
+	} else {
+		go func() {
+			if err := httpServer.ListenAndServe(); err != nil {
+				errSig <- err
+			}
+		}()
+	}
+	logger.Info("gRPC server is running.")
 
 	// kill (no param) default send syscall.SIGTERM
 	// kill -2 is syscall.SIGINT
