@@ -2,11 +2,9 @@ package util
 
 import (
 	"fmt"
-	"strings"
 )
 
-func ConvertRequestToResourceName(requestName string, uid string) string {
-	resourceType := strings.SplitN(requestName, "/", 2)[0]
+func ConvertUIDToResourcePermalink(uid string, resourceType string) string {
 	resourceName := fmt.Sprintf("resources/%s/types/%s", uid, resourceType)
 
 	return resourceName
@@ -18,8 +16,8 @@ func ConvertServiceToResourceName(serviceName string) string {
 	return resourceName
 }
 
-func ConvertWorkflfowToWorkflowResourceName(resourceName string) string {
-	resourceWorkflowId := fmt.Sprintf("%s/workflow", resourceName)
+func ConvertResourcePermalinkToWorkflowName(resourcePermalink string) string {
+	resourceWorkflowId := fmt.Sprintf("%s/workflow", resourcePermalink)
 
 	return resourceWorkflowId
 }
