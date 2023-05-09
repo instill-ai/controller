@@ -204,7 +204,7 @@ func TestUpdateResourceState(t *testing.T) {
 		}
 
 		resource := controllerPB.Resource{
-			Name: serviceResourceName,
+			ResourcePermalink: serviceResourceName,
 			State: &controllerPB.Resource_BackendState{
 				BackendState: healthcheckPB.HealthCheckResponse_SERVING_STATUS_UNSPECIFIED,
 			},
@@ -243,7 +243,7 @@ func TestUpdateResourceState(t *testing.T) {
 		}
 
 		resource := controllerPB.Resource{
-			Name: modelResourceName,
+			ResourcePermalink: modelResourceName,
 			State: &controllerPB.Resource_ModelState{
 				ModelState: modelPB.Model_STATE_UNSPECIFIED,
 			},
@@ -282,7 +282,7 @@ func TestUpdateResourceState(t *testing.T) {
 		}
 
 		resource := controllerPB.Resource{
-			Name: connectorResourceName,
+			ResourcePermalink: connectorResourceName,
 			State: &controllerPB.Resource_ConnectorState{
 				ConnectorState: connectorPB.Connector_STATE_UNSPECIFIED,
 			},
@@ -321,7 +321,7 @@ func TestUpdateResourceState(t *testing.T) {
 		}
 
 		resource := controllerPB.Resource{
-			Name: pipelineResourceName,
+			ResourcePermalink: pipelineResourceName,
 			State: &controllerPB.Resource_PipelineState{
 				PipelineState: pipelinePB.Pipeline_STATE_UNSPECIFIED,
 			},

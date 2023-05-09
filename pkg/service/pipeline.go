@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/instill-ai/controller/internal/logger"
@@ -33,6 +34,8 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
+	wg.Add(int(totalSize))
+
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.pipelinePrivateClient.ListPipelinesAdmin(ctx, &pipelinePB.ListPipelinesAdminRequest{
 			PageToken: nextPageToken,
@@ -48,17 +51,17 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 		pipelines = append(pipelines, resp.Pipelines...)
 	}
 
-	wg.Add(len(pipelines))
+	resourceType := "pipelines"
 
 	for _, pipeline := range pipelines {
 
 		go func(pipeline *pipelinePB.Pipeline) {
 			defer wg.Done()
 
-			resourceName := util.ConvertRequestToResourceName(pipeline.Name, pipeline.Uid)
+			resourcePermalink := util.ConvertUIDToResourcePermalink(pipeline.Uid, resourceType)
 
 			pipelineResource := controllerPB.Resource{
-				Name: resourceName,
+				ResourcePermalink: resourcePermalink,
 				State: &controllerPB.Resource_PipelineState{
 					PipelineState: pipelinePB.Pipeline_STATE_INACTIVE,
 				},
@@ -79,35 +82,19 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 
 			var resources []*controllerPB.Resource
 			// source connector
-			getSourceConnectorResp, err := s.connectorPrivateClient.GetSourceConnectorAdmin(ctx, &connectorPB.GetSourceConnectorAdminRequest{
-				Name: pipeline.Recipe.Source,
-			})
+			sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(pipeline.Recipe.Source, "/")[1], "source-connectors"))
 			if err != nil {
 				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error("no record found for source connector in postgresql")
-				return
-			}
-			sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Source, getSourceConnectorResp.SourceConnector.Uid))
-			if err != nil {
-				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error("no record found for source connector in etcd")
+				logger.Error(fmt.Sprintf("no record found for %s in etcd", pipeline.Recipe.Source))
 				return
 			}
 			resources = append(resources, sourceConnectorResource)
 
 			// destination connector
-			getDestinationConnectorResp, err := s.connectorPrivateClient.GetDestinationConnectorAdmin(ctx, &connectorPB.GetDestinationConnectorAdminRequest{
-				Name: pipeline.Recipe.Destination,
-			})
+			destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(pipeline.Recipe.Destination, "/")[1], "destination-connectors"))
 			if err != nil {
 				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error("no record found for destination connector in postgresql")
-				return
-			}
-			destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(pipeline.Recipe.Destination, getDestinationConnectorResp.DestinationConnector.Uid))
-			if err != nil {
-				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error("no record found for destination connector in etcd")
+				logger.Error(fmt.Sprintf("no record found for %s in etcd", pipeline.Recipe.Destination))
 				return
 			}
 			resources = append(resources, destinationConnectorResource)
@@ -115,15 +102,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 			// models
 			modelNames := pipeline.Recipe.Models
 			for _, modelName := range modelNames {
-				getModelResp, err := s.modelPrivateClient.GetModelAdmin(ctx, &modelPB.GetModelAdminRequest{
-					Name: modelName,
-				})
-				if err != nil {
-					s.UpdateResourceState(ctx, &pipelineResource)
-					logger.Error("no record found for model in postgresql")
-					return
-				}
-				modelResource, err := s.GetResourceState(ctx, util.ConvertRequestToResourceName(modelName, getModelResp.Model.Uid))
+				modelResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(modelName, "/")[1], "models"))
 				if err != nil {
 					s.UpdateResourceState(ctx, &pipelineResource)
 					logger.Error(fmt.Sprintf("no record found for model  %v", modelName))
@@ -179,7 +158,7 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 			}
 			s.UpdateResourceState(ctx, &pipelineResource)
 
-			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logResp, _ := s.GetResourceState(ctx, resourcePermalink)
 			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(pipeline)
 	}

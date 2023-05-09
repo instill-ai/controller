@@ -45,17 +45,19 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 		connectors = append(connectors, resp.SourceConnectors...)
 	}
 
+	connectorType := "source-connectors"
+
 	for _, connector := range connectors {
 
 		go func(connector *connectorPB.SourceConnector) {
 			defer wg.Done()
 
-			resourceName := util.ConvertRequestToResourceName(connector.Name, connector.Uid)
+			resourcePermalink := util.ConvertUIDToResourcePermalink(connector.Uid, connectorType)
 
 			// if user desires disconnected
 			if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
 				if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-					Name: resourceName,
+					ResourcePermalink: resourcePermalink,
 					State: &controllerPB.Resource_ConnectorState{
 						ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
 					},
@@ -65,7 +67,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 				}
 			}
 			// if user desires connected
-			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
+			workflowId, _ := s.GetResourceWorkflowId(ctx, resourcePermalink)
 			// check if there is an ongoing workflow
 			if workflowId != nil {
 				opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_SOURCE_CONNECTOR)
@@ -74,7 +76,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 					return
 				}
 				if opInfo.Done {
-					if err := s.DeleteResourceWorkflowId(ctx, resourceName); err != nil {
+					if err := s.DeleteResourceWorkflowId(ctx, resourcePermalink); err != nil {
 						logger.Error(err.Error())
 						return
 					}
@@ -82,19 +84,19 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 				// if not trigger connector check workflow
 			} else {
 				resp, err := s.connectorPrivateClient.CheckSourceConnector(ctx, &connectorPB.CheckSourceConnectorRequest{
-					Name: connector.Name,
+					SourceConnectorPermalink: fmt.Sprintf("%s/%s", connectorType, connector.Uid),
 				})
 				if err != nil {
 					logger.Error(err.Error())
 					return
 				}
 				// non grpc/http connector, save workflowid
-				if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
+				if err := s.updateStaleConnector(ctx, resourcePermalink, resp.WorkflowId); err != nil {
 					logger.Error(err.Error())
 					return
 				}
 			}
-			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logResp, _ := s.GetResourceState(ctx, resourcePermalink)
 			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(connector)
 	}
@@ -121,6 +123,8 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
+	wg.Add(int(totalSize))
+
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPrivateClient.ListDestinationConnectorsAdmin(ctx, &connectorPB.ListDestinationConnectorsAdminRequest{
 			PageToken: nextPageToken,
@@ -135,19 +139,19 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 		connectors = append(connectors, resp.DestinationConnectors...)
 	}
 
-	wg.Add(len(connectors))
+	connectorType := "destination-connectors"
 
 	for _, connector := range connectors {
 
 		go func(connector *connectorPB.DestinationConnector) {
 			defer wg.Done()
 
-			resourceName := util.ConvertRequestToResourceName(connector.Name, connector.Uid)
+			resourcePermalink := util.ConvertUIDToResourcePermalink(connector.Uid, connectorType)
 
 			// if user desires disconnected
 			if connector.Connector.State == connectorPB.Connector_STATE_DISCONNECTED {
 				if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-					Name: resourceName,
+					ResourcePermalink: resourcePermalink,
 					State: &controllerPB.Resource_ConnectorState{
 						ConnectorState: connectorPB.Connector_STATE_DISCONNECTED,
 					},
@@ -157,7 +161,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 				}
 			}
 			// if user desires connected
-			workflowId, _ := s.GetResourceWorkflowId(ctx, resourceName)
+			workflowId, _ := s.GetResourceWorkflowId(ctx, resourcePermalink)
 			// check if there is an ongoing workflow
 			if workflowId != nil {
 				opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_DESTINATION_CONNECTOR)
@@ -166,7 +170,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 					return
 				}
 				if opInfo.Done {
-					if err := s.DeleteResourceWorkflowId(ctx, resourceName); err != nil {
+					if err := s.DeleteResourceWorkflowId(ctx, resourcePermalink); err != nil {
 						logger.Error(err.Error())
 						return
 					}
@@ -174,18 +178,18 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 				// if not trigger connector check workflow
 			} else {
 				resp, err := s.connectorPrivateClient.CheckDestinationConnector(ctx, &connectorPB.CheckDestinationConnectorRequest{
-					Name: connector.Name,
+					DestinationConnectorPermalink: fmt.Sprintf("%s/%s", connectorType, connector.Uid),
 				})
 				if err != nil {
 					logger.Error(err.Error())
 					return
 				}
-				if err := s.updateStaleConnector(ctx, resourceName, resp.WorkflowId); err != nil {
+				if err := s.updateStaleConnector(ctx, resourcePermalink, resp.WorkflowId); err != nil {
 					logger.Error(err.Error())
 					return
 				}
 			}
-			logResp, _ := s.GetResourceState(ctx, resourceName)
+			logResp, _ := s.GetResourceState(ctx, resourcePermalink)
 			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(connector)
 	}
@@ -195,15 +199,15 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	return nil
 }
 
-func (s *service) updateStaleConnector(ctx context.Context, resourceName string, workflowId string) error {
+func (s *service) updateStaleConnector(ctx context.Context, resourcePermalink string, workflowId string) error {
 	// non grpc/http connector, save workflowid
 	if workflowId != "" {
-		if err := s.UpdateResourceWorkflowId(ctx, resourceName, workflowId); err != nil {
+		if err := s.UpdateResourceWorkflowId(ctx, resourcePermalink, workflowId); err != nil {
 			return err
 		}
 	} else {
 		if err := s.UpdateResourceState(ctx, &controllerPB.Resource{
-			Name: resourceName,
+			ResourcePermalink: resourcePermalink,
 			State: &controllerPB.Resource_ConnectorState{
 				ConnectorState: connectorPB.Connector_STATE_CONNECTED,
 			},
