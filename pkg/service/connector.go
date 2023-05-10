@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
@@ -96,6 +97,26 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 					return
 				}
 			}
+			// Temporary block for repopulate resources
+			workflowId, _ = s.GetResourceWorkflowId(ctx, resourcePermalink)
+			if workflowId != nil {
+				logger.Info(fmt.Sprintf("[controller] repopulate %s...", resourcePermalink))
+				for {
+					opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_SOURCE_CONNECTOR)
+					if err != nil {
+						logger.Error(err.Error())
+					}
+					if opInfo.Done{
+						if err := s.DeleteResourceWorkflowId(ctx, resourcePermalink); err != nil {
+							logger.Error(err.Error())
+							return
+						}
+						break
+					}
+					time.Sleep(time.Second)
+				}
+			}
+
 			logResp, _ := s.GetResourceState(ctx, resourcePermalink)
 			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))
 		}(connector)
@@ -187,6 +208,25 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 				if err := s.updateStaleConnector(ctx, resourcePermalink, resp.WorkflowId); err != nil {
 					logger.Error(err.Error())
 					return
+				}
+			}
+			// Temporary block for repopulate resources
+			workflowId, _ = s.GetResourceWorkflowId(ctx, resourcePermalink)
+			if workflowId != nil {
+				logger.Info(fmt.Sprintf("[controller] repopulate %s...", resourcePermalink))
+				for {
+					opInfo, err := s.getOperationInfo(*workflowId, util.RESOURCE_TYPE_DESTINATION_CONNECTOR)
+					if err != nil {
+						logger.Error(err.Error())
+					}
+					if opInfo.Done{
+						if err := s.DeleteResourceWorkflowId(ctx, resourcePermalink); err != nil {
+							logger.Error(err.Error())
+							return
+						}
+						break
+					}
+					time.Sleep(time.Second)
 				}
 			}
 			logResp, _ := s.GetResourceState(ctx, resourcePermalink)
