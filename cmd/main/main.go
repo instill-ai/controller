@@ -55,6 +55,18 @@ func grpcHandlerFunc(grpcServer *grpc.Server, gwHandler http.Handler, CORSOrigin
 	)
 }
 
+// repopulate possible missing resource record in etcd while controller is down
+func rePopulateEtcdResource(ctx context.Context, s service.Service) error {
+	// Connectors
+	if err := s.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+		return err
+	}
+	if err := s.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	if err := config.Init(); err != nil {
 		log.Fatal(err.Error())
@@ -202,12 +214,16 @@ func main() {
 	logger.Info("gRPC server is running.")
 
 	go func() {
+		// repopulate connector resource
+		logger.Info("[Controller] repopulate possibly missing resources while controller is down...")
+		rePopulateEtcdResource(ctx, service)
+
 		logger.Info("[controller] control loop started")
 		var mainWG sync.WaitGroup
 		for {
-			logger.Info("[Controller] --------------Start probing------------")
+			logger.Info("[controller] --------------Start probing------------")
 
-			mainWG.Add(5)
+			mainWG.Add(3)
 
 			// Backend services
 			go func() {
@@ -226,18 +242,19 @@ func main() {
 			}()
 
 			// Connectors
-			go func() {
-				defer mainWG.Done()
-				if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-					logger.Error(err.Error())
-				}
-			}()
-			go func() {
-				defer mainWG.Done()
-				if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-					logger.Error(err.Error())
-				}
-			}()
+			// TODO: Temporary disable connector probing due to airbyte container spawn usage burst, will be revisited
+			// go func() {
+			// 	defer mainWG.Done()
+			// 	if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+			// 		logger.Error(err.Error())
+			// 	}
+			// }()
+			// go func() {
+			// 	defer mainWG.Done()
+			// 	if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+			// 		logger.Error(err.Error())
+			// 	}
+			// }()
 
 			// Pipelines
 			go func() {
