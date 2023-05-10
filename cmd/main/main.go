@@ -226,18 +226,19 @@ func main() {
 			}()
 
 			// Connectors
-			go func() {
-				defer mainWG.Done()
-				if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-					logger.Error(err.Error())
-				}
-			}()
-			go func() {
-				defer mainWG.Done()
-				if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-					logger.Error(err.Error())
-				}
-			}()
+			// TODO: Temporary disable connector probing due to airbyte container spawn usage burst, will be revisited
+			// go func() {
+			// 	defer mainWG.Done()
+			// 	if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+			// 		logger.Error(err.Error())
+			// 	}
+			// }()
+			// go func() {
+			// 	defer mainWG.Done()
+			// 	if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+			// 		logger.Error(err.Error())
+			// 	}
+			// }()
 
 			// Pipelines
 			go func() {
