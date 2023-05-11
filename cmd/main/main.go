@@ -202,12 +202,15 @@ func main() {
 	logger.Info("gRPC server is running.")
 
 	go func() {
+		// repopulate connector resource
+		isRepopulate := false
+
 		logger.Info("[controller] control loop started")
 		var mainWG sync.WaitGroup
 		for {
-			logger.Info("[Controller] --------------Start probing------------")
+			logger.Info("[controller] --------------Start probing------------")
 
-			mainWG.Add(5)
+			mainWG.Add(3)
 
 			// Backend services
 			go func() {
@@ -226,18 +229,24 @@ func main() {
 			}()
 
 			// Connectors
-			go func() {
-				defer mainWG.Done()
-				if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-					logger.Error(err.Error())
-				}
-			}()
-			go func() {
-				defer mainWG.Done()
-				if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
-					logger.Error(err.Error())
-				}
-			}()
+			// TODO: Temporary disable connector probing due to airbyte container spawn usage burst, will be revisited
+			if !isRepopulate {
+				logger.Info("[controller] some resources might be out of date while controller is down, repopulating...")
+				mainWG.Add(2)
+				go func() {
+					defer mainWG.Done()
+					if err := service.ProbeSourceConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+						logger.Error(err.Error())
+					}
+				}()
+				go func() {
+					defer mainWG.Done()
+					if err := service.ProbeDestinationConnectors(context.WithTimeout(ctx, config.Config.Server.Timeout*time.Second)); err != nil {
+						logger.Error(err.Error())
+					}
+				}()
+				isRepopulate = true
+			}
 
 			// Pipelines
 			go func() {
