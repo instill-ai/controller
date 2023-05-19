@@ -34,8 +34,6 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	wg.Add(int(totalSize))
-
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.pipelinePrivateClient.ListPipelinesAdmin(ctx, &pipelinePB.ListPipelinesAdminRequest{
 			PageToken: nextPageToken,
@@ -52,6 +50,8 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 	}
 
 	resourceType := "pipelines"
+
+	wg.Add(len(pipelines))
 
 	for _, pipeline := range pipelines {
 
@@ -81,35 +81,48 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 			pipelineResource.State = &controllerPB.Resource_PipelineState{PipelineState: pipelinePB.Pipeline_STATE_ERROR}
 
 			var resources []*controllerPB.Resource
-			// source connector
-			sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(pipeline.Recipe.Source, "/")[1], "source-connectors"))
-			if err != nil {
-				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error(fmt.Sprintf("no record found for %s in etcd", pipeline.Recipe.Source))
-				return
-			}
-			resources = append(resources, sourceConnectorResource)
 
-			// destination connector
-			destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(pipeline.Recipe.Destination, "/")[1], "destination-connectors"))
-			if err != nil {
-				s.UpdateResourceState(ctx, &pipelineResource)
-				logger.Error(fmt.Sprintf("no record found for %s in etcd", pipeline.Recipe.Destination))
-				return
-			}
-			resources = append(resources, destinationConnectorResource)
+			for _, component := range pipeline.Recipe.Components {
 
-			// models
-			modelNames := pipeline.Recipe.Models
-			for _, modelName := range modelNames {
-				modelResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(modelName, "/")[1], "models"))
-				if err != nil {
-					s.UpdateResourceState(ctx, &pipelineResource)
-					logger.Error(fmt.Sprintf("no record found for model  %v", modelName))
-					return
+				if i := strings.Index(component.ResourceName, "/"); i >= 0 {
+					switch component.ResourceName[:i] {
+					case "source-connectors":
+						sourceConnectorResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(component.ResourceName, "/")[1], "source-connectors"))
+						if err != nil {
+							resErr := s.UpdateResourceState(ctx, &pipelineResource)
+							if resErr != nil {
+								logger.Error(fmt.Sprintf("UpdateResourceState failed for %s", component.ResourceName))
+							}
+							logger.Error(fmt.Sprintf("no record found for %s in etcd", component.ResourceName))
+							return
+						}
+						resources = append(resources, sourceConnectorResource)
+					case "destination-connectors":
+						destinationConnectorResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(component.ResourceName, "/")[1], "destination-connectors"))
+						if err != nil {
+							resErr := s.UpdateResourceState(ctx, &pipelineResource)
+							if resErr != nil {
+								logger.Error(fmt.Sprintf("UpdateResourceState failed for %s", component.ResourceName))
+							}
+							logger.Error(fmt.Sprintf("no record found for %s in etcd", component.ResourceName))
+							return
+						}
+						resources = append(resources, destinationConnectorResource)
+					case "models":
+						modelResource, err := s.GetResourceState(ctx, util.ConvertUIDToResourcePermalink(strings.Split(component.ResourceName, "/")[1], "models"))
+						if err != nil {
+							resErr := s.UpdateResourceState(ctx, &pipelineResource)
+							if resErr != nil {
+								logger.Error(fmt.Sprintf("UpdateResourceState failed for %s", component.ResourceName))
+							}
+							logger.Error(fmt.Sprintf("no record found for %s in etcd", component.ResourceName))
+							return
+						}
+
+						resources = append(resources, modelResource)
+					}
 				}
 
-				resources = append(resources, modelResource)
 			}
 
 			for _, r := range resources {
@@ -149,14 +162,20 @@ func (s *service) ProbePipelines(ctx context.Context, cancel context.CancelFunc)
 						continue
 					}
 				}
-				s.UpdateResourceState(ctx, &pipelineResource)
+				resErr := s.UpdateResourceState(ctx, &pipelineResource)
+				if resErr != nil {
+					logger.Error(fmt.Sprintf("UpdateResourceState failed for %s", pipeline.Name))
+				}
 				return
 			}
 
 			pipelineResource.State = &controllerPB.Resource_PipelineState{
 				PipelineState: pipelinePB.Pipeline_STATE_ACTIVE,
 			}
-			s.UpdateResourceState(ctx, &pipelineResource)
+			resErr := s.UpdateResourceState(ctx, &pipelineResource)
+			if resErr != nil {
+				logger.Error(fmt.Sprintf("UpdateResourceState failed for %s", pipeline.Name))
+			}
 
 			logResp, _ := s.GetResourceState(ctx, resourcePermalink)
 			logger.Info(fmt.Sprintf("[Controller] Got %v", logResp))

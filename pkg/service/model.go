@@ -29,8 +29,6 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	wg.Add(int(totalSize))
-
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.modelPrivateClient.ListModelsAdmin(ctx, &modelPB.ListModelsAdminRequest{
 			PageToken: nextPageToken,
@@ -46,6 +44,8 @@ func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) er
 	}
 
 	resourceType := "models"
+
+	wg.Add(len(models))
 
 	for _, model := range models {
 

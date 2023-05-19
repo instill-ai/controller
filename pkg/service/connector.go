@@ -30,8 +30,6 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	wg.Add(int(totalSize))
-
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPrivateClient.ListSourceConnectorsAdmin(ctx, &connectorPB.ListSourceConnectorsAdminRequest{
 			PageToken: nextPageToken,
@@ -47,6 +45,8 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 	}
 
 	connectorType := "source-connectors"
+
+	wg.Add(len(connectors))
 
 	for _, connector := range connectors {
 
@@ -106,7 +106,7 @@ func (s *service) ProbeSourceConnectors(ctx context.Context, cancel context.Canc
 					if err != nil {
 						logger.Error(err.Error())
 					}
-					if opInfo.Done{
+					if opInfo.Done {
 						if err := s.DeleteResourceWorkflowId(ctx, resourcePermalink); err != nil {
 							logger.Error(err.Error())
 							return
@@ -144,8 +144,6 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	nextPageToken := &resp.NextPageToken
 	totalSize := resp.TotalSize
 
-	wg.Add(int(totalSize))
-
 	for totalSize > util.DefaultPageSize {
 		resp, err := s.connectorPrivateClient.ListDestinationConnectorsAdmin(ctx, &connectorPB.ListDestinationConnectorsAdminRequest{
 			PageToken: nextPageToken,
@@ -161,6 +159,8 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 	}
 
 	connectorType := "destination-connectors"
+
+	wg.Add(len(connectors))
 
 	for _, connector := range connectors {
 
@@ -219,7 +219,7 @@ func (s *service) ProbeDestinationConnectors(ctx context.Context, cancel context
 					if err != nil {
 						logger.Error(err.Error())
 					}
-					if opInfo.Done{
+					if opInfo.Done {
 						if err := s.DeleteResourceWorkflowId(ctx, resourcePermalink); err != nil {
 							logger.Error(err.Error())
 							return
