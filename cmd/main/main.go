@@ -18,6 +18,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -210,6 +211,13 @@ func main() {
 		for {
 			logger.Info("[controller] --------------Start probing------------")
 
+			for etcdClient.ActiveConnection().GetState() != connectivity.Ready {
+				logger.Warn("[controller] etcd connection lost, waiting for state change...")
+				etcdClient.ActiveConnection().WaitForStateChange(ctx, connectivity.TransientFailure)
+				time.Sleep(50 * time.Millisecond)
+				isRepopulate = false
+			}
+
 			mainWG.Add(3)
 
 			// Backend services
@@ -231,7 +239,7 @@ func main() {
 			// Connectors
 			// TODO: Temporary disable connector probing due to airbyte container spawn usage burst, will be revisited
 			if !isRepopulate {
-				logger.Info("[controller] some resources might be out of date while controller is down, repopulating...")
+				logger.Info("[controller] some resources might be out of date while controller or etcd is down, repopulating...")
 				mainWG.Add(2)
 				go func() {
 					defer mainWG.Done()
