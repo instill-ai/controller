@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/util"
+	"github.com/instill-ai/controller/pkg/logger"
 
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
 	modelPB "github.com/instill-ai/protogen-go/vdp/model/v1alpha"
@@ -15,7 +15,7 @@ import (
 func (s *service) ProbeModels(ctx context.Context, cancel context.CancelFunc) error {
 	defer cancel()
 
-	logger, _ := logger.GetZapLogger()
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var wg sync.WaitGroup
 
