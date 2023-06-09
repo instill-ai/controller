@@ -9,18 +9,20 @@ import (
 	"time"
 
 	"cloud.google.com/go/longrunning/autogen/longrunningpb"
+
+	etcdv3 "go.etcd.io/etcd/client/v3"
+
+	"github.com/instill-ai/controller/config"
+	"github.com/instill-ai/controller/internal/triton"
+	"github.com/instill-ai/controller/internal/util"
+	"github.com/instill-ai/controller/pkg/logger"
+
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
 	healthcheckPB "github.com/instill-ai/protogen-go/vdp/healthcheck/v1alpha"
 	mgmtPB "github.com/instill-ai/protogen-go/vdp/mgmt/v1alpha"
 	modelPB "github.com/instill-ai/protogen-go/vdp/model/v1alpha"
 	pipelinePB "github.com/instill-ai/protogen-go/vdp/pipeline/v1alpha"
-	etcdv3 "go.etcd.io/etcd/client/v3"
-
-	"github.com/instill-ai/controller/config"
-	"github.com/instill-ai/controller/internal/logger"
-	"github.com/instill-ai/controller/internal/triton"
-	"github.com/instill-ai/controller/internal/util"
 )
 
 type Service interface {
@@ -208,7 +210,7 @@ func (s *service) DeleteResourceWorkflowId(ctx context.Context, resourcePermalin
 func (s *service) ProbeBackend(ctx context.Context, cancel context.CancelFunc) error {
 	defer cancel()
 
-	logger, _ := logger.GetZapLogger()
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var wg sync.WaitGroup
 

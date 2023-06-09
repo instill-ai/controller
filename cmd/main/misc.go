@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/instill-ai/controller/internal/logger"
+	"github.com/instill-ai/controller/pkg/logger"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,7 +39,7 @@ func httpResponseModifier(ctx context.Context, w http.ResponseWriter, p proto.Me
 }
 
 func errorHandler(ctx context.Context, mux *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
-	logger, _ := logger.GetZapLogger()
+	logger, _ := logger.GetZapLogger(ctx)
 
 	// return Internal when Marshal failed
 	const fallback = `{"code": 13, "message": "failed to marshal error message"}`
@@ -156,6 +156,8 @@ func customMatcher(key string) (string, bool) {
 	case "Request-Id":
 		return key, true
 	case "Username":
+		return key, true
+	case "X-B3-Traceid", "X-B3-Spanid", "X-B3-Sampled":
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)

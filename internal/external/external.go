@@ -1,6 +1,7 @@
 package external
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -9,8 +10,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/instill-ai/controller/config"
-	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/internal/triton"
+	"github.com/instill-ai/controller/pkg/logger"
 
 	connectorPB "github.com/instill-ai/protogen-go/vdp/connector/v1alpha"
 	mgmtPB "github.com/instill-ai/protogen-go/vdp/mgmt/v1alpha"
@@ -20,8 +21,8 @@ import (
 )
 
 // InitTritonServiceClient initialises a TritonServiceClient instance
-func InitEtcdServiceClient() (*etcdv3.Client) {
-	logger, _ := logger.GetZapLogger()
+func InitEtcdServiceClient(ctx context.Context) *etcdv3.Client {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	if config.Config.ConnectorBackend.HTTPS.Cert != "" && config.Config.ConnectorBackend.HTTPS.Key != "" {
@@ -39,7 +40,7 @@ func InitEtcdServiceClient() (*etcdv3.Client) {
 	timeout := config.Config.Etcd.Timeout * time.Second
 	// Create etcd client
 	client, err := etcdv3.New(etcdv3.Config{
-		Endpoints: []string{fmt.Sprintf("%s:%s", host, port)}, //TODO: multiple nodes
+		Endpoints:   []string{fmt.Sprintf("%s:%s", host, port)}, //TODO: multiple nodes
 		DialTimeout: timeout,
 		DialOptions: []grpc.DialOption{clientDialOpts},
 	})
@@ -51,8 +52,8 @@ func InitEtcdServiceClient() (*etcdv3.Client) {
 }
 
 // InitTritonServiceClient initialises a TritonServiceClient instance
-func InitTritonServiceClient() (inferenceserver.GRPCInferenceServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitTritonServiceClient(ctx context.Context) (inferenceserver.GRPCInferenceServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 	grpcUri := config.Config.TritonServer.GrpcURI
 	// Connect to triton grpc server
 	clientConn, err := grpc.Dial(grpcUri, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -64,8 +65,8 @@ func InitTritonServiceClient() (inferenceserver.GRPCInferenceServiceClient, *grp
 }
 
 // InitConnectorPublicServiceClient initialises a ConnectorPublicServiceClient instance
-func InitConnectorPublicServiceClient() (connectorPB.ConnectorPublicServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitConnectorPublicServiceClient(ctx context.Context) (connectorPB.ConnectorPublicServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	if config.Config.ConnectorBackend.HTTPS.Cert != "" && config.Config.ConnectorBackend.HTTPS.Key != "" {
@@ -88,8 +89,8 @@ func InitConnectorPublicServiceClient() (connectorPB.ConnectorPublicServiceClien
 }
 
 // InitConnectorPrivateServiceClient initialises a ConnectorPrivateServiceClient instance
-func InitConnectorPrivateServiceClient() (connectorPB.ConnectorPrivateServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitConnectorPrivateServiceClient(ctx context.Context) (connectorPB.ConnectorPrivateServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	if config.Config.ConnectorBackend.HTTPS.Cert != "" && config.Config.ConnectorBackend.HTTPS.Key != "" {
@@ -112,8 +113,8 @@ func InitConnectorPrivateServiceClient() (connectorPB.ConnectorPrivateServiceCli
 }
 
 // InitModelPublicServiceClient initialises a ModelPublicServiceClient instance
-func InitModelPublicServiceClient() (modelPB.ModelPublicServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitModelPublicServiceClient(ctx context.Context) (modelPB.ModelPublicServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	if config.Config.ModelBackend.HTTPS.Cert != "" && config.Config.ModelBackend.HTTPS.Key != "" {
@@ -136,8 +137,8 @@ func InitModelPublicServiceClient() (modelPB.ModelPublicServiceClient, *grpc.Cli
 }
 
 // InitModelPrivateServiceClient initialises a ModelPrivateServiceClient instance
-func InitModelPrivateServiceClient() (modelPB.ModelPrivateServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitModelPrivateServiceClient(ctx context.Context) (modelPB.ModelPrivateServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	if config.Config.ModelBackend.HTTPS.Cert != "" && config.Config.ModelBackend.HTTPS.Key != "" {
@@ -160,8 +161,8 @@ func InitModelPrivateServiceClient() (modelPB.ModelPrivateServiceClient, *grpc.C
 }
 
 // InitMgmtPublicServiceClient initialises a MgmtPublicServiceClient instance
-func InitMgmtPublicServiceClient() (mgmtPB.MgmtPublicServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitMgmtPublicServiceClient(ctx context.Context) (mgmtPB.MgmtPublicServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	var creds credentials.TransportCredentials
@@ -186,8 +187,8 @@ func InitMgmtPublicServiceClient() (mgmtPB.MgmtPublicServiceClient, *grpc.Client
 }
 
 // InitPipelinePublicServiceClient initialises a PipelinePublicServiceClient instance
-func InitPipelinePublicServiceClient() (pipelinePB.PipelinePublicServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitPipelinePublicServiceClient(ctx context.Context) (pipelinePB.PipelinePublicServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	var creds credentials.TransportCredentials
@@ -212,8 +213,8 @@ func InitPipelinePublicServiceClient() (pipelinePB.PipelinePublicServiceClient, 
 }
 
 // InitPipelinePrivateServiceClient initialises a PipelinePrivateServiceClient instance
-func InitPipelinePrivateServiceClient() (pipelinePB.PipelinePrivateServiceClient, *grpc.ClientConn) {
-	logger, _ := logger.GetZapLogger()
+func InitPipelinePrivateServiceClient(ctx context.Context) (pipelinePB.PipelinePrivateServiceClient, *grpc.ClientConn) {
+	logger, _ := logger.GetZapLogger(ctx)
 
 	var clientDialOpts grpc.DialOption
 	var creds credentials.TransportCredentials

@@ -15,6 +15,9 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/rs/cors"
+	"go.opentelemetry.io/contrib/propagators/b3"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
@@ -30,12 +33,15 @@ import (
 
 	"github.com/instill-ai/controller/config"
 	"github.com/instill-ai/controller/internal/external"
-	"github.com/instill-ai/controller/internal/logger"
 	"github.com/instill-ai/controller/pkg/handler"
+	"github.com/instill-ai/controller/pkg/logger"
 	"github.com/instill-ai/controller/pkg/service"
 
+	custom_otel "github.com/instill-ai/controller/pkg/logger/otel"
 	controllerPB "github.com/instill-ai/protogen-go/vdp/controller/v1alpha"
 )
+
+var propagator propagation.TextMapPropagator
 
 func grpcHandlerFunc(grpcServer *grpc.Server, gwHandler http.Handler, CORSOrigins []string) http.Handler {
 	return h2c.NewHandler(
@@ -46,6 +52,11 @@ func grpcHandlerFunc(grpcServer *grpc.Server, gwHandler http.Handler, CORSOrigin
 			AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "HEAD"},
 		}).Handler(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+				propagator = b3.New(b3.WithInjectEncoding(b3.B3MultipleHeader))
+				ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+				r = r.WithContext(ctx)
+
 				if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
 					grpcServer.ServeHTTP(w, r)
 				} else {
@@ -61,7 +72,30 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	logger, _ := logger.GetZapLogger()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	if tp, err := custom_otel.SetupTracing(ctx, "controller"); err != nil {
+		panic(err)
+	} else {
+		defer func() {
+			err = tp.Shutdown(ctx)
+		}()
+	}
+
+	if mp, err := custom_otel.SetupMetrics(ctx, "controller"); err != nil {
+		panic(err)
+	} else {
+		defer func() {
+			err = mp.Shutdown(ctx)
+		}()
+	}
+
+	ctx, span := otel.Tracer("main-tracer").Start(ctx,
+		"main",
+	)
+	defer cancel()
+
+	logger, _ := logger.GetZapLogger(ctx)
 	defer func() {
 		// can't handle the error due to https://github.com/uber-go/zap/issues/880
 		_ = logger.Sync()
@@ -110,31 +144,31 @@ func main() {
 	grpcS := grpc.NewServer(grpcServerOpts...)
 	reflection.Register(grpcS)
 
-	mgmtPublicServiceClient, mgmtPublicServiceClientConn := external.InitMgmtPublicServiceClient()
+	mgmtPublicServiceClient, mgmtPublicServiceClientConn := external.InitMgmtPublicServiceClient(ctx)
 	defer mgmtPublicServiceClientConn.Close()
 
-	pipelinePublicServiceClient, pipelinePublicServiceClientConn := external.InitPipelinePublicServiceClient()
+	pipelinePublicServiceClient, pipelinePublicServiceClientConn := external.InitPipelinePublicServiceClient(ctx)
 	defer pipelinePublicServiceClientConn.Close()
 
-	pipelinePrivateServiceClient, pipelinePrivateServiceClientConn := external.InitPipelinePrivateServiceClient()
+	pipelinePrivateServiceClient, pipelinePrivateServiceClientConn := external.InitPipelinePrivateServiceClient(ctx)
 	defer pipelinePrivateServiceClientConn.Close()
 
-	modelPublicServiceClient, modelPublicServiceClientConn := external.InitModelPublicServiceClient()
+	modelPublicServiceClient, modelPublicServiceClientConn := external.InitModelPublicServiceClient(ctx)
 	defer modelPublicServiceClientConn.Close()
 
-	modelPrivateServiceClient, modelPrivateServiceClientConn := external.InitModelPrivateServiceClient()
+	modelPrivateServiceClient, modelPrivateServiceClientConn := external.InitModelPrivateServiceClient(ctx)
 	defer modelPrivateServiceClientConn.Close()
 
-	connectorPublicServiceClient, connectorPublicServiceClientConn := external.InitConnectorPublicServiceClient()
+	connectorPublicServiceClient, connectorPublicServiceClientConn := external.InitConnectorPublicServiceClient(ctx)
 	defer connectorPublicServiceClientConn.Close()
 
-	connectorPrivateServiceClient, connectorPrivateServiceClientConn := external.InitConnectorPrivateServiceClient()
+	connectorPrivateServiceClient, connectorPrivateServiceClientConn := external.InitConnectorPrivateServiceClient(ctx)
 	defer connectorPrivateServiceClientConn.Close()
 
-	etcdClient := external.InitEtcdServiceClient()
+	etcdClient := external.InitEtcdServiceClient(ctx)
 	defer etcdClient.Close()
 
-	tritonClient, tritonClientConn := external.InitTritonServiceClient()
+	tritonClient, tritonClientConn := external.InitTritonServiceClient(ctx)
 	defer tritonClientConn.Close()
 
 	service := service.NewService(
@@ -154,9 +188,6 @@ func main() {
 			service,
 		),
 	)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	serverMux := runtime.NewServeMux(
 		runtime.WithForwardResponseOption(httpResponseModifier),
@@ -200,6 +231,7 @@ func main() {
 			}
 		}()
 	}
+	span.End()
 	logger.Info("gRPC server is running.")
 
 	go func() {
