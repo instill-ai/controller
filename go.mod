@@ -11,7 +11,6 @@ require (
 	github.com/instill-ai/protogen-go v0.3.3-alpha.0.20230519150901-3d25cb5a4a49
 	github.com/knadh/koanf v1.5.0
 	github.com/redis/go-redis/v9 v9.0.2
-	github.com/rs/cors v1.8.2
 	github.com/stretchr/testify v1.8.3
 	go.etcd.io/etcd/api/v3 v3.5.7
 	go.etcd.io/etcd/client/v3 v3.5.7
