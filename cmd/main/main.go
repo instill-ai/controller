@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/rs/cors"
 	"go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -43,26 +42,20 @@ import (
 
 var propagator propagation.TextMapPropagator
 
-func grpcHandlerFunc(grpcServer *grpc.Server, gwHandler http.Handler, CORSOrigins []string) http.Handler {
+func grpcHandlerFunc(grpcServer *grpc.Server, gwHandler http.Handler) http.Handler {
 	return h2c.NewHandler(
-		cors.New(cors.Options{
-			AllowedOrigins:   CORSOrigins,
-			AllowCredentials: true,
-			Debug:            false,
-			AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "HEAD"},
-		}).Handler(
-			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-				propagator = b3.New(b3.WithInjectEncoding(b3.B3MultipleHeader))
-				ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-				r = r.WithContext(ctx)
+			propagator = b3.New(b3.WithInjectEncoding(b3.B3MultipleHeader))
+			ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+			r = r.WithContext(ctx)
 
-				if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
-					grpcServer.ServeHTTP(w, r)
-				} else {
-					gwHandler.ServeHTTP(w, r)
-				}
-			})),
+			if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
+				grpcServer.ServeHTTP(w, r)
+			} else {
+				gwHandler.ServeHTTP(w, r)
+			}
+		}),
 		&http2.Server{},
 	)
 }
@@ -212,7 +205,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%v", config.Config.Server.Port),
-		Handler: grpcHandlerFunc(grpcS, serverMux, config.Config.Server.CORSOrigins),
+		Handler: grpcHandlerFunc(grpcS, serverMux),
 	}
 
 	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 5 seconds.

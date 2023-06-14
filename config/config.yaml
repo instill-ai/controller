@@ -3,7 +3,6 @@ server:
   https:
     cert:
     key:
-  corsorigins:
   edition: local-ce:dev
   loopinterval: 3
   timeout: 120

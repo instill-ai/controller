@@ -38,7 +38,6 @@ type ServerConfig struct {
 		Cert string `koanf:"cert"`
 		Key  string `koanf:"key"`
 	}
-	CORSOrigins  []string      `koanf:"corsorigins"`
 	Edition      string        `koanf:"edition"`
 	Debug        bool          `koanf:"debug"`
 	LoopInterval time.Duration `koanf:"loopinterval"`
