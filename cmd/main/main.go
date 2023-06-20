@@ -232,7 +232,7 @@ func main() {
 		}()
 	}
 	span.End()
-	logger.Info("gRPC server is running.")
+	logger.Info("gRPC server is running. sleep for 10 sec")
 
 	time.Sleep(10 * time.Second)
 
