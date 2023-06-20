@@ -234,6 +234,8 @@ func main() {
 	span.End()
 	logger.Info("gRPC server is running.")
 
+	time.Sleep(10 * time.Second)
+
 	go func() {
 		// repopulate connector resource
 		isRepopulate := false
