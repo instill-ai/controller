@@ -5,7 +5,7 @@ package vdp.controller.v1alpha;
 // Google API
 import "google/api/field_behavior.proto";
 
-import "../../../vdp/healthcheck/v1alpha/healthcheck.proto";
+import "../../healthcheck/v1alpha/healthcheck.proto";
 
 // LivenessRequest represents a request to check a service liveness status
 message LivenessRequest {

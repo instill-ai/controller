@@ -44,7 +44,7 @@ mgmtbackend:
     cert:
     key:
 log:
-  external: true
+  external: false
   otelcollector:
     host: otel-collector
     port: 8095
