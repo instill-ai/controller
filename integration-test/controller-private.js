@@ -11,7 +11,7 @@ clientPrivate.load(['proto/vdp/controller/v1alpha'], 'controller_service.proto')
 
 export function CheckModelResource() {
     var httpModelResource = {
-        "name": constant.modelResourceName,
+        "resource_permalink": constant.modelResourcePermalink,
         "model_state": "STATE_ONLINE"
     }
 
@@ -24,28 +24,32 @@ export function CheckModelResource() {
             resource: httpModelResource
         })
 
+        console.log(resCreateModelHTTP)
+
+        console.log(httpModelResource.resource_permalink)
+
         check(resCreateModelHTTP, {
             "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response StatusOK": (r) => r.status === grpc.StatusOK,
-            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response modelResource name matched": (r) => r.message.resource.name == httpModelResource.name,
+            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response modelResource resource_permalink matched": (r) => r.message.resource.resourcePermalink == httpModelResource.resource_permalink,
         });
     });
 
     group("Controller API: Get model resource state in etcd", () => {
         var resGetModelHTTP = clientPrivate.invoke(`vdp.controller.v1alpha.ControllerPrivateService/GetResource`, {
-            name: httpModelResource.name
+            resource_permalink: httpModelResource.resource_permalink
         })
 
         check(resGetModelHTTP, {
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpModelResource.name} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpModelResource.name} response modelResource name matched`]: (r) => r.message.resource.name === httpModelResource.name,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpModelResource.name} response modelResource state matched STATE_ONLINE`]: (r) => r.message.resource.modelState == "STATE_ONLINE",
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpModelResource.resource_permalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpModelResource.resource_permalink} response modelResource resource_permalink matched`]: (r) => r.message.resource.resourcePermalink === httpModelResource.resource_permalink,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpModelResource.resource_permalink} response modelResource state matched STATE_ONLINE`]: (r) => r.message.resource.modelState == "STATE_ONLINE",
         });
     });
 }
 
 export function CheckSourceConnectorResource() {
     var httpSourceConnectorResource = {
-        "name": constant.sourceConnectorResourceName,
+        "resource_permalink": constant.sourceConnectorResourcePermalink,
         "connector_state": "STATE_CONNECTED"
     }
 
@@ -60,26 +64,26 @@ export function CheckSourceConnectorResource() {
 
         check(resCreateSourceConnectorHTTP, {
             "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response StatusOK": (r) => r.status === grpc.StatusOK,
-            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response connectorResource name matched": (r) => r.message.resource.name == httpSourceConnectorResource.name,
+            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response connectorResource resource_permalink matched": (r) => r.message.resource.resourcePermalink == httpSourceConnectorResource.resource_permalink,
         });
     });
 
     group("Controller API: Get source connector resource state in etcd", () => {
         var resGetSourceConnectorHTTP = clientPrivate.invoke(`vdp.controller.v1alpha.ControllerPrivateService/GetResource`, {
-            name: httpSourceConnectorResource.name
+            resource_permalink: httpSourceConnectorResource.resource_permalink
         })
 
         check(resGetSourceConnectorHTTP, {
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpSourceConnectorResource.name} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpSourceConnectorResource.name} response connectorResource name matched`]: (r) => r.message.resource.name === httpSourceConnectorResource.name,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpSourceConnectorResource.name} response connectorResource state matched STATE_CONNECTED`]: (r) => r.message.resource.connectorState == "STATE_CONNECTED",
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpSourceConnectorResource.resource_permalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpSourceConnectorResource.resource_permalink} response connectorResource resource_permalink matched`]: (r) => r.message.resource.resourcePermalink === httpSourceConnectorResource.resource_permalink,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpSourceConnectorResource.resource_permalink} response connectorResource state matched STATE_CONNECTED`]: (r) => r.message.resource.connectorState == "STATE_CONNECTED",
         });
     });
 }
 
 export function CheckDestinationConnectorResource() {
     var httpDestinationConnectorResource = {
-        "name": constant.destinationConnectorResourceName,
+        "resource_permalink": constant.destinationConnectorResourcePermalink,
         "connector_state": "STATE_CONNECTED"
     }
 
@@ -94,26 +98,26 @@ export function CheckDestinationConnectorResource() {
 
         check(resCreatpDestinationConnectorHTTP, {
             "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response StatusOK": (r) => r.status === grpc.StatusOK,
-            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response connectorResource name matched": (r) => r.message.resource.name == httpDestinationConnectorResource.name,
+            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response connectorResource resource_permalink matched": (r) => r.message.resource.resourcePermalink == httpDestinationConnectorResource.resource_permalink,
         });
     });
 
     group("Controller API: Get destination connector resource state in etcd", () => {
         var resGetDestinationConnectorHTTP = clientPrivate.invoke(`vdp.controller.v1alpha.ControllerPrivateService/GetResource`, {
-            name: httpDestinationConnectorResource.name
+            resource_permalink: httpDestinationConnectorResource.resource_permalink
         })
 
         check(resGetDestinationConnectorHTTP, {
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpDestinationConnectorResource.name} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpDestinationConnectorResource.name} response connectorResource name matched`]: (r) => r.message.resource.name === httpDestinationConnectorResource.name,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpDestinationConnectorResource.name} response connectorResource state matched STATE_CONNECTED`]: (r) => r.message.resource.connectorState == "STATE_CONNECTED",
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpDestinationConnectorResource.resource_permalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpDestinationConnectorResource.resource_permalink} response connectorResource resource_permalink matched`]: (r) => r.message.resource.resourcePermalink === httpDestinationConnectorResource.resource_permalink,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpDestinationConnectorResource.resource_permalink} response connectorResource state matched STATE_CONNECTED`]: (r) => r.message.resource.connectorState == "STATE_CONNECTED",
         });
     });
 }
 
 export function CheckPipelineResource() {
     var httpPipelineResource = {
-        "name": constant.pipelineResourceName,
+        "resource_permalink": constant.pipelineResourcePermalink,
         "pipeline_state": "STATE_ACTIVE"
     }
 
@@ -128,26 +132,26 @@ export function CheckPipelineResource() {
 
         check(resCreatePipelineHTTP, {
             "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response StatusOK": (r) => r.status === grpc.StatusOK,
-            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response pipeline name matched": (r) => r.message.resource.name == httpPipelineResource.name,
+            "vdp.controller.v1alpha.ControllerPrivateService/UpdateResource response pipeline resource_permalink matched": (r) => r.message.resource.resourcePermalink == httpPipelineResource.resource_permalink,
         });
     });
 
     group("Controller API: Get pipeline resource state in etcd", () => {
         var resGetPipelineHTTP = clientPrivate.invoke(`vdp.controller.v1alpha.ControllerPrivateService/GetResource`, {
-            name: httpPipelineResource.name
+            resource_permalink: httpPipelineResource.resource_permalink
         })
 
         check(resGetPipelineHTTP, {
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.name} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.name} response pipeline name matched`]: (r) => r.message.resource.name === httpPipelineResource.name,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.name} response pipeline state matched STATE_ACTIVE`]: (r) => r.message.resource.pipelineState == "STATE_ACTIVE",
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.resource_permalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.resource_permalink} response pipeline resource_permalink matched`]: (r) => r.message.resource.resourcePermalink === httpPipelineResource.resource_permalink,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpPipelineResource.resource_permalink} response pipeline state matched STATE_ACTIVE`]: (r) => r.message.resource.pipelineState == "STATE_ACTIVE",
         });
     });
 }
 
 export function CheckServiceResource() {
     var httpServiceResource = {
-        "name": constant.serviceResourceName,
+        "resource_permalink": constant.serviceResourceName,
         "backend_state": "SERVING_STATUS_SERVING"
     }
 
@@ -168,13 +172,13 @@ export function CheckServiceResource() {
 
     group("Controller API: Get service resource state in etcd", () => {
         var resGetServiceHTTP = clientPrivate.invoke(`vdp.controller.v1alpha.ControllerPrivateService/GetResource`, {
-            name: httpServiceResource.name
+            resource_permalink: httpServiceResource.resource_permalink
         })
 
         check(resGetServiceHTTP, {
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.name} response StatusOK`]: (r) => r.status === grpc.StatusOK,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.name} response service name matched`]: (r) => r.message.resource.name === httpServiceResource.name,
-            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.name} response service state matched STATE_ACTIVE`]: (r) => r.message.resource.backendState == "SERVING_STATUS_SERVING",
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.resource_permalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.resource_permalink} response service name matched`]: (r) => r.message.resource.resourcePermalink === httpServiceResource.resource_permalink,
+            [`vdp.controller.v1alpha.ControllerPrivateService/GetResource ${httpServiceResource.resource_permalink} response service state matched STATE_ACTIVE`]: (r) => r.message.resource.backendState == "SERVING_STATUS_SERVING",
         });
     });
 }

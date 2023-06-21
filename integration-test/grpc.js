@@ -57,31 +57,31 @@ export function teardown(data) {
     group("Controller API: Delete all resources created by the test", () => {
 
       check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-        name: constant.modelResourceName
+        resource_permalink: constant.modelResourcePermalink
       }), {
-        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.modelResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.modelResourcePermalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
       });
 
       check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-        name: constant.sourceConnectorResourceName
+        resource_permalink: constant.sourceConnectorResourcePermalink
       }), {
-        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.sourceConnectorResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.sourceConnectorResourcePermalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
       });
 
       check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-        name: constant.destinationConnectorResourceName
+        resource_permalink: constant.destinationConnectorResourcePermalink
       }), {
-        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.destinationConnectorResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.destinationConnectorResourcePermalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
       });
 
       check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-        name: constant.pipelineResourceName
+        resource_permalink: constant.pipelineResourcePermalink
       }), {
-        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.pipelineResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
+        [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.pipelineResourcePermalink} response StatusOK`]: (r) => r.status === grpc.StatusOK,
       });
 
       check(client.invoke(`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource`, {
-        name: constant.serviceResourceName
+        resource_permalink: constant.serviceResourceName
       }), {
         [`vdp.controller.v1alpha.ControllerPrivateService/DeleteResource ${constant.serviceResourceName} response StatusOK`]: (r) => r.status === grpc.StatusOK,
       });
